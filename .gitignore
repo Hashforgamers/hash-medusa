@@ -132,3 +132,16 @@ dist
 .DS_Store
 
 static/
+
+.command
+# Private local Hash credentials and integration fixtures
+.local/
+
+# Local agent configuration
+.codex/
+.env.production
+.env.production.*
+!.env.production.example
+
+portal-dist/
+.vercel/

@@ -1,0 +1,10 @@
+const fs=require('fs'),path=require('path');
+const value=process.env.HASH_BACKEND_URL;
+if(!value)throw new Error('Set HASH_BACKEND_URL to the deployed HTTPS Medusa backend URL before deploying this portal');
+const url=new URL(value);
+if(url.protocol!=='https:' || url.username || url.password || url.search || url.hash || url.pathname!=='/')throw new Error('HASH_BACKEND_URL must be a plain HTTPS origin without credentials, path or query');
+let html=fs.readFileSync(path.resolve(__dirname,'../src/lib/hash/portal.html'),'utf8');
+const config=JSON.stringify(url.origin).replace(/</g,'\\u003c');
+html=html.replace('<script>',`<script>window.HASH_BACKEND_URL=${config};</script><script>`);
+const out=path.resolve(__dirname,'../../portal-dist');fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'index.html'),html);
+console.log('Built the Hash portal with an HTTPS backend origin.');

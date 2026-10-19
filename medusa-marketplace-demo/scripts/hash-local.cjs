@@ -1,0 +1,10 @@
+const fs=require('fs'),path=require('path'),cp=require('child_process'),crypto=require('crypto');
+process.chdir(path.resolve(__dirname,'..'));
+const dir=path.join(process.cwd(),'.local');fs.mkdirSync(dir,{recursive:true});
+const secretPath=path.join(dir,'otp-secret');if(!fs.existsSync(secretPath))fs.writeFileSync(secretPath,crypto.randomBytes(32).toString('hex'),{mode:0o600});
+const env={...process.env,DATABASE_URL:process.env.HASH_LOCAL_DATABASE_URL||'postgres://marketplace:super-secure-password@127.0.0.1:5433/marketplace',HASH_OTP_SECRET:fs.readFileSync(secretPath,'utf8')};
+const mode=process.argv[2]||'dev';
+const args=mode==='setup'?['exec','./src/scripts/hash-setup.ts']:['develop'];
+const child=cp.spawn(path.join(process.cwd(),'node_modules','.bin','medusa'),args,{env,stdio:'inherit'});
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));
+child.on('exit',code=>process.exit(code||0));

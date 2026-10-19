@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const {nextBusinessDay,split,paise,newOtp,matchesOtp}=require('../src/lib/hash/policy');
+process.env.HASH_OTP_SECRET='test-secret-only';
+assert.deepEqual(split(100101,0),{net:100101,payment:50050,completion:50051});
+assert.deepEqual(split(100000,1000),{net:90000,payment:45000,completion:45000});
+assert.equal(paise('1001.01'),100101);
+assert.deepEqual(split(Number.MAX_SAFE_INTEGER,10000),{net:0,payment:0,completion:0});
+assert.throws(()=>split(-1,0));
+assert.throws(()=>paise(-1));assert.throws(()=>paise(NaN));
+assert.equal(nextBusinessDay(new Date('2026-10-16T12:00:00Z'),[]).toISOString(),'2026-10-18T18:30:00.000Z');
+assert.equal(nextBusinessDay(new Date('2026-10-16T12:00:00Z'),['2026-10-19']).toISOString(),'2026-10-19T18:30:00.000Z');
+assert.equal(nextBusinessDay(new Date('2026-10-19T20:00:00Z'),[]).toISOString(),'2026-10-20T18:30:00.000Z');
+const otp=newOtp('order');assert(matchesOtp('order',otp.nonce,otp.code,otp.digest));assert(!matchesOtp('other',otp.nonce,otp.code,otp.digest));assert(!matchesOtp('order',otp.nonce,'bad',otp.digest));
+console.log('PASS INR conversion, odd-paise split, commission, IST boundary, weekends, holidays and OTP binding.');

@@ -1,0 +1,37 @@
+const fs=require('fs'),assert=require('node:assert/strict');
+const base=process.env.HASH_TEST_URL||'http://localhost:9000';
+if(!['localhost','127.0.0.1'].includes(new URL(base).hostname))throw new Error('These fixtures may only run locally');
+async function req(path,method='GET',body,token,expected=200,key){const r=await fetch(base+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(key?{'x-publishable-api-key':key}:{})},...(body?{body:JSON.stringify(body)}:{})});let data;const raw=await r.text();try{data=JSON.parse(raw)}catch{data={raw}}assert.equal(r.status,expected,`${method} ${path}: ${JSON.stringify(data)}`);return data;}
+(async()=>{
+ const admin=JSON.parse(fs.readFileSync('.local/hash-admin.json'));
+ const {token}=await req('/auth/user/emailpass','POST',admin);
+ let state=await req('/admin/hash','GET',null,token);assert.equal(state.actor.superAdmin,true);
+ const suffix=Date.now();
+ const v1=(await req('/admin/hash','POST',{action:'onboard',name:'QA Vendor A '+suffix,email:`qa-a-${suffix}@example.test`},token)).result;
+ const v2=(await req('/admin/hash','POST',{action:'onboard',name:'QA Vendor B '+suffix,email:`qa-b-${suffix}@example.test`},token)).result;
+ const login=async v=>(await req('/auth/user/emailpass','POST',{email:v.email,password:v.temporary_password})).token;
+ const t1=await login(v1),t2=await login(v2);
+ for(const [v,t] of [[v1,t1],[v2,t2]])await req('/admin/hash','POST',{action:'change_password',current_password:v.temporary_password,new_password:v.temporary_password+'-new'},t);
+ const p=(await req('/admin/hash','POST',{action:'save_product',vendor_id:v1.vendor_id,title:'QA Service '+suffix,description:'Integration test service',kind:'service',price_inr:1001.01,stock:10},t1)).result;
+ await req('/admin/products/'+p.product_id,'GET',null,t2,400);
+ await req('/admin/products/'+p.product_id,'DELETE',null,t2,400);
+ await req('/admin/users','GET',null,t2,400);
+ await req('/admin/hash','POST',{action:'review_product',product_id:p.product_id,approval:'approved'},t1,400);
+ await req('/admin/hash','POST',{action:'stock',product_id:p.product_id,stock:99},t2,404);
+ await req('/admin/hash','POST',{action:'save_product',product_id:p.product_id,vendor_id:v1.vendor_id,title:'Hacked',kind:'service',price_inr:1,stock:99},t2,404);
+ const s2=await req('/admin/hash','GET',null,t2);assert(!s2.products.some(x=>x.product_id===p.product_id));
+ await req('/admin/hash','POST',{action:'review_product',product_id:p.product_id,approval:'approved'},token);
+ state=await req('/admin/hash','GET',null,token);const product=state.products.find(x=>x.product_id===p.product_id);assert.equal(product.approval,'approved');assert.equal(Number(product.stock),10);assert.equal(Number(product.price_inr),1001.01);
+ const {Pool}=require('pg'),pool=new Pool({connectionString:'postgres://marketplace:super-secure-password@127.0.0.1:5433/marketplace'});
+ const key=(await pool.query("SELECT token FROM api_key WHERE title='HFG Frontend' AND deleted_at IS NULL")).rows[0].token;await pool.end();
+ assert((await req('/store/products','GET',null,null,200,key)).products.some(x=>x.id===p.product_id));
+ const settings={action:'vendor_settings',vendor_id:v1.vendor_id,commission_bps:0,payment_mode:'hash_collects',payout_details:''};
+ await req('/admin/hash','POST',{...settings,status:'suspended'},token);
+ assert(!(await req('/store/products','GET',null,null,200,key)).products.some(x=>x.id===p.product_id));
+ await req('/store/products/'+p.product_id,'GET',null,null,404,key);
+ assert(!(await req('/store/hash/products','GET',null,null,200,key)).products.some(x=>x.product_id===p.product_id));
+ await req('/admin/hash','POST',{...settings,status:'active'},token);
+ console.log('PASS native and HFG catalog suspension guards.');
+ fs.writeFileSync('.local/hash-test-fixture.json',JSON.stringify({token,v1,v2,t1,t2,product},null,2),{mode:0o600});
+ console.log('PASS onboarding, required password change, product creation / approval, stock and price, cross-vendor read/write denial, admin escalation denial.');
+})().catch(e=>{console.error(e);process.exit(1)});
