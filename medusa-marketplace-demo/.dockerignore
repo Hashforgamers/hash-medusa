@@ -1,0 +1,10 @@
+node_modules
+.medusa
+.local
+.git
+.codex
+.env*
+!.env.template
+*.log
+coverage
+docs

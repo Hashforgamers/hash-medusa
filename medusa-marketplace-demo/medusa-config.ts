@@ -1,6 +1,8 @@
-import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+import { loadEnv, defineConfig, Modules } from '@medusajs/framework/utils'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
+
+const useRedis = !!process.env.REDIS_URL && (process.env.NODE_ENV === 'production' || process.env.HASH_USE_REDIS === 'true')
 
 module.exports = defineConfig({
   admin: {
@@ -14,6 +16,7 @@ module.exports = defineConfig({
   },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    redisUrl: useRedis ? process.env.REDIS_URL : undefined,
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
@@ -22,10 +25,13 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
     }
   },
-  plugins: [
-    {
-      resolve: "@techlabi/medusa-marketplace-plugin",
-      options: {},
-    },
-  ],
+  // Redis-backed infrastructure is enabled on the hosted deployment.
+  modules: useRedis ? [
+    { key: Modules.CACHE, resolve: "@medusajs/cache-redis", options: { redisUrl: process.env.REDIS_URL } },
+    { key: Modules.EVENT_BUS, resolve: "@medusajs/event-bus-redis", options: { redisUrl: process.env.REDIS_URL } },
+    { key: Modules.WORKFLOW_ENGINE, resolve: "@medusajs/workflow-engine-redis", options: { redis: { url: process.env.REDIS_URL } } },
+    { key: Modules.LOCKING, resolve: "@medusajs/locking", options: { providers: [
+      { resolve: "@medusajs/locking-redis", id: "redis", is_default: true, options: { redisUrl: process.env.REDIS_URL } },
+    ] } },
+  ] : [],
 })

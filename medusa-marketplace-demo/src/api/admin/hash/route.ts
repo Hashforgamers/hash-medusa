@@ -1,0 +1,90 @@
+import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { Modules } from "@medusajs/framework/utils"
+import { z } from "zod"
+import { actor, requireHash, own, fail } from "../../../lib/hash/access"
+import { db, audit, transaction } from "../../../lib/hash/db"
+import { onboard, addMember, saveProduct, reviewProduct, catalog, setStock } from "../../../lib/hash/marketplace"
+import { reconcileAll, recordPayout, verifyOtp, reviewAdjustment } from "../../../lib/hash/settlements"
+const id = z.string().min(1).max(200)
+const commands = z.discriminatedUnion("action",[
+ z.object({action:z.literal("onboard"),name:z.string().min(2).max(150),email:z.string().email().transform(s=>s.toLowerCase()),commission_bps:z.number().int().min(0).max(10000).default(0),payment_mode:z.enum(["hash_collects","vendor_direct"]).default("hash_collects"),payout_details:z.string().max(2000).default("")}),
+ z.object({action:z.literal("add_member"),vendor_id:id,email:z.string().email().transform(s=>s.toLowerCase())}),
+ z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01),stock:z.number().int().min(0).max(10000000)}),
+ z.object({action:z.literal("review_product"),product_id:id,approval:z.enum(["approved","rejected"]),review_note:z.string().max(1000).default("")}),
+ z.object({action:z.literal("vendor_settings"),vendor_id:id,status:z.enum(["active","suspended"]),commission_bps:z.number().int().min(0).max(10000),payment_mode:z.enum(["hash_collects","vendor_direct"]),payout_details:z.string().max(2000)}),
+ z.object({action:z.literal("verify_otp"),order_id:id,code:z.string().regex(/^\d{6}$/)}),
+ z.object({action:z.literal("record_payout"),settlement_id:id,reference:z.string().trim().min(3).max(200)}),
+ z.object({action:z.literal("payout_failed"),settlement_id:id,reason:z.string().min(3).max(1000)}),
+ z.object({action:z.literal("reconcile")}),
+ z.object({action:z.literal("review_adjustment"),order_id:id,note:z.string().min(3).max(1000)}),
+ z.object({action:z.literal("stock"),product_id:id,stock:z.number().int().min(0).max(10000000)}),
+ z.object({action:z.literal("change_password"),current_password:z.string().min(1),new_password:z.string().min(12).max(200)}),
+ z.object({action:z.literal("remove_member"),user_id:id})
+])
+export async function GET(req: MedusaRequest,res: MedusaResponse) {
+ const a = await actor(req)
+ if (typeof req.query.order_id === "string") {
+  const {rows:[o]}=await db().query("SELECT vendor_id FROM hash_order WHERE order_id=$1",[req.query.order_id])
+  if(!o)fail("Order not found");own(a,o.vendor_id)
+  const {data:[order]}=await req.scope.resolve("query").graph({entity:"order",fields:["id","display_id","email","currency_code","created_at","items.title","items.quantity","items.unit_price","shipping_address.*"],filters:{id:req.query.order_id}})
+  return res.json({order})
+ }
+ const filter = a.superAdmin ? null : a.vendor_id
+ const [{rows:vendors},{rows:orders},{rows:settlements},{rows:members}] = await Promise.all([
+  db().query("SELECT * FROM hash_vendor WHERE ($1::text IS NULL OR id=$1) ORDER BY created_at DESC",[filter]),
+  db().query(`SELECT order_id,vendor_id,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,paid_at,completed_at,hold_reason,created_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
+  db().query(`SELECT s.*,o.hold_reason,CASE WHEN s.status='scheduled' AND s.due_at<=now() THEN 'due' ELSE s.status END AS display_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id WHERE ($1::text IS NULL OR s.vendor_id=$1) ORDER BY s.due_at DESC LIMIT 1000`,[filter]),
+  db().query(`SELECT m.*,u.email FROM hash_member m JOIN "user" u ON u.id=m.user_id WHERE ($1::text IS NULL OR vendor_id=$1) AND u.deleted_at IS NULL`,[filter])
+ ])
+ const user = await req.scope.resolve(Modules.USER).retrieveUser(a.id)
+ const products = await catalog(req.scope,filter)
+ const auditRows = a.superAdmin ? (await db().query("SELECT * FROM hash_audit ORDER BY id DESC LIMIT 100")).rows : []
+ res.setHeader("Cache-Control","no-store")
+ res.json({actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},vendors,products,orders,settlements,members,audit:auditRows,policy:{currency:"INR",split:"50% after full capture / 50% after OTP completion",timing:"T+1 business day, Asia/Kolkata",payout_provider:"manual"}})
+}
+export async function POST(req: MedusaRequest,res: MedusaResponse) {
+ const a = await actor(req), parsed = commands.safeParse(req.body)
+ if (!parsed.success) return res.status(400).json({message:parsed.error.issues.map(i=>`${i.path.join(".")}: ${i.message}`).join("; ")})
+ const b = parsed.data
+ const user = await req.scope.resolve(Modules.USER).retrieveUser(a.id)
+ if (user.metadata?.hash_password_change_required && b.action!=="change_password") fail("Change your temporary password before continuing")
+ let result: any
+ switch(b.action) {
+ case "onboard": result=await onboard(req.scope,a,b); break
+ case "add_member": result=await addMember(req.scope,a,b); break
+ case "save_product": result=await saveProduct(req.scope,a,b); break
+ case "review_product": result=await reviewProduct(req.scope,a,b); break
+ case "verify_otp": result=await verifyOtp(req.scope,a,b.order_id,b.code); break
+ case "record_payout": requireHash(a);result=await recordPayout(req.scope,a,b.settlement_id,b.reference);break
+ case "review_adjustment": requireHash(a);result=await reviewAdjustment(req.scope,a,b.order_id,b.note);break
+ case "reconcile": requireHash(a);await reconcileAll(req.scope);result={ok:true};break
+ case "stock": {
+  const {rows:[p]}=await db().query("SELECT * FROM hash_listing WHERE product_id=$1",[b.product_id]); if(!p) fail("Product not found");own(a,p.vendor_id)
+  await transaction(`product:${b.product_id}`,async c=>{await setStock(req.scope,b.product_id,b.stock);await audit(c,a.id,"stock_updated",b.product_id,{stock:b.stock})});result={ok:true};break
+ }
+ case "vendor_settings": requireHash(a);await transaction(`vendor:${b.vendor_id}`,async c=>{
+  const {rowCount}=await c.query("UPDATE hash_vendor SET status=$2,commission_bps=$3,payment_mode=$4,payout_details=$5 WHERE id=$1",[b.vendor_id,b.status,b.commission_bps,b.payment_mode,b.payout_details]);if(!rowCount)fail("Vendor not found")
+  await audit(c,a.id,"vendor_settings_updated",b.vendor_id,{status:b.status,commission_bps:b.commission_bps,payment_mode:b.payment_mode})
+ });result={ok:true};break
+ case "payout_failed": {
+  requireHash(a)
+  const {rows:[s]}=await db().query("SELECT * FROM hash_settlement WHERE id=$1",[b.settlement_id]);if(!s)fail("Settlement not found")
+  await transaction(`order:${s.order_id}`,async c=>{const {rowCount}=await c.query("UPDATE hash_settlement SET status='failed',failure_reason=$2 WHERE id=$1 AND status IN ('scheduled','failed')",[b.settlement_id,b.reason]);if(!rowCount)fail("Cannot fail a paid or processing settlement");await audit(c,a.id,"payout_failed",b.settlement_id,{reason:b.reason})});result={ok:true};break
+ }
+ case "remove_member": {
+  const {rows:[m]}=await db().query("SELECT * FROM hash_member WHERE user_id=$1",[b.user_id]);if(!m)fail("Member not found");own(a,m.vendor_id)
+  if(!a.superAdmin && (a.role!=="owner" || m.role!=="staff"))fail("Only Hash can remove an owner")
+  await transaction(`member:${b.user_id}`,async c=>{await c.query("DELETE FROM hash_member WHERE user_id=$1",[b.user_id]);await audit(c,a.id,"member_removed",b.user_id)});result={ok:true};break
+ }
+ case "change_password": {
+  const auth=req.scope.resolve(Modules.AUTH)
+  const verified=await auth.authenticate("emailpass",{body:{email:a.email,password:b.current_password}})
+  if(!verified.success)fail("Current password is incorrect")
+  const updated=await auth.updateProvider("emailpass",{entity_id:a.email,password:b.new_password})
+  if(!updated.success)fail("Unable to update password")
+  await req.scope.resolve(Modules.USER).updateUsers({id:a.id,metadata:{...user.metadata,hash_password_change_required:false}})
+  await audit(db(),a.id,"password_changed",a.id);result={ok:true};break
+ }
+ }
+ res.json({result})
+}

@@ -1,3 +1,19 @@
+# Hash Marketplace
+
+Medusa powers the commerce backend. The custom Hash portal provides vendor and super-admin access; HFG consumes the storefront APIs.
+
+- Vendor portal: `partners.hashforgamers.com` (deployment target).
+- Backend: Render, with dedicated PostgreSQL and Redis.
+- Portal: Vercel, built from the repository root using `vercel.json`.
+- Integration and policies: [HFG guide](medusa-marketplace-demo/docs/HFG-MARKETPLACE.md).
+- Hosting: [deployment guide](medusa-marketplace-demo/docs/DEPLOYMENT.md).
+
+For local development, run `npm ci`, `npm run db:local`, `npm run hash:setup:local`, and `npm run dev:local` inside `medusa-marketplace-demo`. Open `http://localhost:9000/hash-portal`.
+
+Payments currently use Medusa's manual provider. Payout entries record transfers made outside the system; automatic provider payouts and direct vendor routing require integration before accepting live customer payments.
+
+## Original project background
+
 # Medusa2 Marketplace demo
 
 This is a demo project which demoes how to create a multivendor marketplace demo using [Medusa 2.0](https://medusajs.com/)
