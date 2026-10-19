@@ -23,3 +23,7 @@ Add `partners.hashforgamers.com` to the project. Apply the exact DNS record Verc
 Check backend `/health`, portal sign-in, vendor isolation, and a listing approval. Share the HFG publishable API key and region/channel IDs with the frontend team via an appropriate channel. Publishable keys are public identifiers; admin passwords and JWT/OTP secrets are not.
 
 Live payment collection is not configured: the manual payment provider is for controlled testing. The ledger records eligibility and external payouts, not bank transfers. Configure and verify the payment provider before live customer checkout.
+
+## Free demo deployment
+
+Set `HASH_DEMO_MODE=true` to explicitly allow in-memory processing without Redis. This runs one instance for demonstration only; background state does not survive restarts. Do not use for live transactions. The Render free database created for this demo expires November 18, 2026. Export or upgrade before expiry. Free web instances sleep when idle.

@@ -1,5 +1,8 @@
 const cp=require('child_process'),path=require('path');
-for(const key of ['DATABASE_URL','REDIS_URL','STORE_CORS','ADMIN_CORS','AUTH_CORS','JWT_SECRET','COOKIE_SECRET','HASH_OTP_SECRET']){
+const demoMode=process.env.HASH_DEMO_MODE==='true';
+if(!demoMode && !process.env.REDIS_URL)throw new Error('REDIS_URL is required outside demo mode');
+if(demoMode){delete process.env.REDIS_URL;console.warn('DEMO MODE: in-memory processing; not for live transactions.')}
+for(const key of ['DATABASE_URL','STORE_CORS','ADMIN_CORS','AUTH_CORS','JWT_SECRET','COOKIE_SECRET','HASH_OTP_SECRET']){
  if(!process.env[key])throw new Error(`${key} is required for production`);
 }
 for(const key of ['JWT_SECRET','COOKIE_SECRET','HASH_OTP_SECRET']){
