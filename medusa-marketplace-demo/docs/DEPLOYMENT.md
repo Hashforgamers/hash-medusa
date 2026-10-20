@@ -26,4 +26,16 @@ Live payment collection is not configured: the manual payment provider is for co
 
 ## Free demo deployment
 
-Set `HASH_DEMO_MODE=true` to explicitly allow in-memory processing without Redis. This runs one instance for demonstration only; background state does not survive restarts. Do not use for live transactions. The Render free database created for this demo expires November 18, 2026. Export or upgrade before expiry. Free web instances sleep when idle.
+Set `HASH_DEMO_MODE=true` to explicitly allow in-memory processing without Redis. This runs one instance for demonstration only; background state does not survive restarts. Do not use for live transactions. Free web instances sleep when idle, so the first sign-in can take longer while the backend wakes. The active database is Neon, not the temporary Render PostgreSQL database.
+
+
+## Hosted configuration (October 20, 2026)
+
+- Portal: https://partners.hashforgamers.com (Vercel project `hash-partners`).
+- Fallback portal: https://hash-partners.vercel.app.
+- Medusa: https://hash-medusa.onrender.com (Render free service `hash-medusa`).
+- Database: Neon project `hfg-backend-aws`, branch `main`, separate database `hash_marketplace`. Use its direct TLS connection URL in Render `DATABASE_URL`; the existing HFG database is unchanged. Neon usage follows the existing account plan.
+- DNS: Squarespace CNAME `partners` → `1789c8e867ed4702.vercel-dns-017.com`.
+- Redis: none in demo mode; no new paid Render resources.
+
+Hosted data starts fresh; local demo vendors and products were not copied. Credentials remain in private, gitignored local handoff files and deployment environment settings.
