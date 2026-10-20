@@ -25,7 +25,7 @@ Never use the bundled local PostgreSQL password outside local development. For a
 - Hash administrators onboard companies and receive a one-time temporary owner password to share privately. No email is sent automatically.
 - Owners and staff must change their temporary password before writing data. Owners can add/remove their own staff. Hash can remove owners and suspend businesses. Every request reloads membership, so removing access applies even to an existing token.
 - Vendor users can only see their own listings, orders, stock and settlements. All native admin APIs are denied to vendor accounts except `GET /admin/users/me`.
-- Listings support a standard variant, HTTPS image URL, product/service type, INR price, description, and stock/service-slot capacity. Vendors can edit and resubmit them. Edits unpublish the listing for a fresh Hash review. Stock-only updates do not require review.
+- Listings support a standard variant, Cloudinary image upload (JPEG/PNG/WebP up to 5 MB), product/service type, INR price, description, and stock/service-slot capacity. Vendors can edit and resubmit them. Edits unpublish the listing for a fresh Hash review. Stock-only updates do not require review.
 - Hash can approve/reject listings, edit vendor listings, set commission, configure payment arrangements and review financial activity. Normal Medusa admin handles richer product variants, fulfillment, refunds and operational exceptions.
 - A listing is purchasable only when approved, published and its vendor is active. Checkout requires an authenticated Medusa customer, INR, and products from exactly one vendor. The completion workflow checks these rules again.
 - `vendor_direct` is stored as a vendor policy but checkout is deliberately unavailable for that mode until direct routing is integrated. It does not silently collect into Hash's account.
@@ -53,7 +53,7 @@ Use HTTPS in deployment. Store requests require `x-publishable-api-key`. Never e
 
 ### Customer identity
 
-Use Medusa customer auth (`/auth/customer/emailpass` plus `/store/customers` account creation) or a separately implemented trusted identity bridge to the existing HFG identity system. An existing HFG JWT is not automatically a Medusa customer token. The customer must own the Medusa order to request its completion OTP.
+The local HFG auth provider exchanges an existing HFG app bearer token at `POST /auth/customer/hfg`, verifying it through authenticated `GET /api/users` on hfg-user-onboard. First-time shoppers create a linked Medusa customer profile without a second password. See [the full HFG Store API contract](HFG-STORE-API.md) for the exact flow, all customer endpoints, environment settings, and rollout limitations. Existing HFG JWTs must be exchanged; they are not Medusa customer tokens. The customer must own the Medusa order to request its completion OTP.
 
 ### Browse products
 

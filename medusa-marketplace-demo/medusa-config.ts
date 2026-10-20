@@ -26,12 +26,18 @@ module.exports = defineConfig({
     }
   },
   // Redis-backed infrastructure is enabled on the hosted deployment.
-  modules: useRedis ? [
+  modules: [
+    { resolve: "@medusajs/medusa/auth", options: { providers: [
+      { resolve: "@medusajs/medusa/auth-emailpass", id: "emailpass" },
+      { resolve: "./src/modules/hfg-auth", id: "hfg" },
+    ] } },
+    ...(useRedis ? [
     { key: Modules.CACHE, resolve: "@medusajs/cache-redis", options: { redisUrl: process.env.REDIS_URL } },
     { key: Modules.EVENT_BUS, resolve: "@medusajs/event-bus-redis", options: { redisUrl: process.env.REDIS_URL } },
     { key: Modules.WORKFLOW_ENGINE, resolve: "@medusajs/workflow-engine-redis", options: { redis: { url: process.env.REDIS_URL } } },
     { key: Modules.LOCKING, resolve: "@medusajs/locking", options: { providers: [
       { resolve: "@medusajs/locking-redis", id: "redis", is_default: true, options: { redisUrl: process.env.REDIS_URL } },
     ] } },
-  ] : [],
+  ] : []),
+  ],
 })

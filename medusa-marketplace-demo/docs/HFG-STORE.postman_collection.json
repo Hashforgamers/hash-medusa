@@ -1,0 +1,659 @@
+{
+  "info": {
+    "name": "HFG Store \u2014 local integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Use HFG-STORE-API.md. Local changes are not deployed. Tokens and IDs are intentionally empty. Manual provider is demo only. Copy response IDs into collection variables; no token logging scripts."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:9000"
+    },
+    {
+      "key": "publishable_key",
+      "value": ""
+    },
+    {
+      "key": "hfg_token",
+      "value": ""
+    },
+    {
+      "key": "medusa_token",
+      "value": ""
+    },
+    {
+      "key": "region_id",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "variant_id",
+      "value": ""
+    },
+    {
+      "key": "cart_id",
+      "value": ""
+    },
+    {
+      "key": "item_id",
+      "value": ""
+    },
+    {
+      "key": "shipping_option_id",
+      "value": ""
+    },
+    {
+      "key": "payment_collection_id",
+      "value": ""
+    },
+    {
+      "key": "payment_provider_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "checkout_email",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Exchange HFG session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/auth/customer/hfg",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{hfg_token}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Create store customer once",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/customers",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "My store profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/customers/me"
+      }
+    },
+    {
+      "name": "India regions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          }
+        ],
+        "url": "{{base_url}}/store/regions"
+      }
+    },
+    {
+      "name": "Approved Hash catalog",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          }
+        ],
+        "url": "{{base_url}}/store/hash/products?limit=20&offset=0"
+      }
+    },
+    {
+      "name": "Product detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          }
+        ],
+        "url": "{{base_url}}/store/products/{{product_id}}?region_id={{region_id}}"
+      }
+    },
+    {
+      "name": "Create single-vendor cart",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"region_id\": \"{{region_id}}\",\n  \"email\": \"{{checkout_email}}\",\n  \"items\": [\n    {\n      \"variant_id\": \"{{variant_id}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Get cart",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}"
+      }
+    },
+    {
+      "name": "Set delivery address",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shipping_address\": {\n    \"first_name\": \"Player\",\n    \"last_name\": \"Name\",\n    \"address_1\": \"Street address\",\n    \"city\": \"Mumbai\",\n    \"province\": \"Maharashtra\",\n    \"postal_code\": \"400001\",\n    \"country_code\": \"in\",\n    \"phone\": \"+919876543210\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Attach guest cart",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}/customer",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Add line item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}/line-items",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Update quantity",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}/line-items/{{item_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quantity\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Remove line item",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}/line-items/{{item_id}}"
+      }
+    },
+    {
+      "name": "Shipping options",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/shipping-options?cart_id={{cart_id}}"
+      }
+    },
+    {
+      "name": "Select shipping",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}/shipping-methods",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"option_id\": \"{{shipping_option_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Payment providers",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/payment-providers?region_id={{region_id}}"
+      }
+    },
+    {
+      "name": "Create payment collection",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/payment-collections",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cart_id\": \"{{cart_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Initialize payment session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/payment-collections/{{payment_collection_id}}/payment-sessions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_id\": \"{{payment_provider_id}}\",\n  \"data\": {}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Complete paid cart",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/carts/{{cart_id}}/complete",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "My orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/orders?limit=20&offset=0"
+      }
+    },
+    {
+      "name": "Order detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/orders/{{order_id}}"
+      }
+    },
+    {
+      "name": "Delivery completion status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/hash/orders/{{order_id}}"
+      }
+    },
+    {
+      "name": "Request completion OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/hash/orders/{{order_id}}/otp",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "List saved addresses",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-publishable-api-key",
+            "value": "{{publishable_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{medusa_token}}"
+          }
+        ],
+        "url": "{{base_url}}/store/customers/me/addresses"
+      }
+    }
+  ]
+}
