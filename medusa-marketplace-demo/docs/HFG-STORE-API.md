@@ -1,11 +1,13 @@
 # HFG Store integration contract
 
-Local implementation for Medusa 2.10.1. These changes have NOT been pushed or deployed.
+Integration contract for Medusa 2.10.1. Verify the target deployment before enabling store access.
 The existing `hfg-user-onboard` service and its database require no changes. Medusa requires the local HFG auth provider and Cloudinary upload endpoint in this change, followed by configuration/deployment when approved.
 
 Import [the Postman collection](HFG-STORE.postman_collection.json) for the main customer flow. Fill its local environment variables; it contains no credentials.
 
 ## Configuration and identity
+
+Apps should first call unauthenticated `GET /hash-store/config` to fetch the publishable key, region and sales channel dynamically. See [the app bootstrap handoff](HFG-APP-BOOTSTRAP.md) for the complete contract and code example. The base URL is the only required static environment value; the placeholders below are populated from that response.
 
 Frontend config:
 
@@ -15,7 +17,7 @@ MEDUSA_PUBLISHABLE_KEY=<HFG Frontend key from hash:setup:local>
 INDIA_REGION_ID=<India region from hash:setup:local>
 ```
 
-Future deployed origin: `https://hash-medusa.onrender.com`. Do not point a frontend at the new auth API there until this change is deployed. IDs and keys differ between local and hosted databases. Find the publishable key in Medusa Admin or setup output; select the INR India region from `GET /store/regions`. Never put admin tokens, Cloudinary secrets or the Medusa JWT signing secret in the frontend.
+Hosted origin: `https://hash-medusa.onrender.com`. Do not point a frontend at the new auth API there until this change is deployed. IDs and keys differ between local and hosted databases. In the Hash portal, super admins can open **Storefront Integration** to copy the active HFG Frontend publishable key, backend URL, linked sales channels, India region IDs and a frontend handoff. This is also available through authenticated `GET /admin/hash/integration` (Hash super admins only; vendors receive 403). The page reads existing configuration and does not create or rotate keys. Alternatively, find the key in Medusa Admin or setup output; select the INR India region from `GET /store/regions`. Never put admin tokens, Cloudinary secrets or the Medusa JWT signing secret in the frontend.
 
 Every `/store/*` request needs `x-publishable-api-key`. Customer-specific requests also need `Authorization: Bearer <MEDUSA_CUSTOMER_TOKEN>`. JSON requests need `Content-Type: application/json`.
 
