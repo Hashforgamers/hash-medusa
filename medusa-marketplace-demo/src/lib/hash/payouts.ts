@@ -2,7 +2,7 @@ import { fail } from "./access"
 // Providers must use settlement.id as their idempotency key. Never retry an ambiguous transfer blindly.
 export interface PayoutAdapter {
   id: string
-  execute(input: { settlementId: string; amountPaise: number; currency: "INR"; vendorId: string; reference?: string }): Promise<{ status: "paid" | "processing"; reference: string }>
+  execute(input: { settlementId: string; amountPaise: number; currency: string; vendorId: string; reference?: string }): Promise<{ status: "paid" | "processing"; reference: string }>
 }
 export const manualPayout: PayoutAdapter = {
   id: "manual",

@@ -5,13 +5,14 @@ import { actor, requireHash, own, fail } from "../../../lib/hash/access"
 import { db, audit, transaction } from "../../../lib/hash/db"
 import { onboard, addMember, saveProduct, reviewProduct, catalog, setStock } from "../../../lib/hash/marketplace"
 import { reconcileAll, recordPayout, verifyOtp, reviewAdjustment } from "../../../lib/hash/settlements"
+import { bankSchema, businessSchema, storedBank, publicVendor } from "../../../lib/hash/vendor-profile"
 const id = z.string().min(1).max(200)
 const commands = z.discriminatedUnion("action",[
- z.object({action:z.literal("onboard"),name:z.string().min(2).max(150),email:z.string().email().transform(s=>s.toLowerCase()),commission_bps:z.number().int().min(0).max(10000).default(0),payment_mode:z.enum(["hash_collects","vendor_direct"]).default("hash_collects"),payout_details:z.string().max(2000).default("")}),
+ z.object({action:z.literal("onboard"),name:z.string().min(2).max(150),email:z.string().email().transform(s=>s.toLowerCase()),commission_bps:z.number().int().min(0).max(10000).default(0),payment_mode:z.enum(["hash_collects","vendor_direct"]).default("hash_collects"),payout_details:z.string().max(2000).default(""),business_details:businessSchema.optional(),bank_details:bankSchema.optional()}),
  z.object({action:z.literal("add_member"),vendor_id:id,email:z.string().email().transform(s=>s.toLowerCase())}),
- z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01),stock:z.number().int().min(0).max(10000000)}),
+ z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01).optional(),prices:z.array(z.object({currency_code:z.string().regex(/^[a-z]{3}$/),amount:z.number().positive().max(10000000)})).min(1).max(30).optional(),stock:z.number().int().min(0).max(10000000)}),
  z.object({action:z.literal("review_product"),product_id:id,approval:z.enum(["approved","rejected"]),review_note:z.string().max(1000).default("")}),
- z.object({action:z.literal("vendor_settings"),vendor_id:id,status:z.enum(["active","suspended"]),commission_bps:z.number().int().min(0).max(10000),payment_mode:z.enum(["hash_collects","vendor_direct"]),payout_details:z.string().max(2000)}),
+ z.object({action:z.literal("vendor_settings"),vendor_id:id,status:z.enum(["active","suspended"]),commission_bps:z.number().int().min(0).max(10000),payment_mode:z.enum(["hash_collects","vendor_direct"]),payout_details:z.string().max(2000),name:z.string().min(2).max(150).optional(),business_details:businessSchema.optional(),bank_details:bankSchema.optional()}),
  z.object({action:z.literal("verify_otp"),order_id:id,code:z.string().regex(/^\d{6}$/)}),
  z.object({action:z.literal("record_payout"),settlement_id:id,reference:z.string().trim().min(3).max(200)}),
  z.object({action:z.literal("payout_failed"),settlement_id:id,reason:z.string().min(3).max(1000)}),
@@ -32,15 +33,17 @@ export async function GET(req: MedusaRequest,res: MedusaResponse) {
  const filter = a.superAdmin ? null : a.vendor_id
  const [{rows:vendors},{rows:orders},{rows:settlements},{rows:members}] = await Promise.all([
   db().query("SELECT * FROM hash_vendor WHERE ($1::text IS NULL OR id=$1) ORDER BY created_at DESC",[filter]),
-  db().query(`SELECT order_id,vendor_id,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,paid_at,completed_at,hold_reason,created_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
-  db().query(`SELECT s.*,o.hold_reason,CASE WHEN s.status='scheduled' AND s.due_at<=now() THEN 'due' ELSE s.status END AS display_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id WHERE ($1::text IS NULL OR s.vendor_id=$1) ORDER BY s.due_at DESC LIMIT 1000`,[filter]),
+  db().query(`SELECT order_id,vendor_id,currency_code,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,paid_at,completed_at,hold_reason,created_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
+  db().query(`SELECT s.*,o.currency_code,o.hold_reason,CASE WHEN NOT (v.bank_details ? 'account_number') THEN 'Bank account required' WHEN v.bank_verified_at IS NULL THEN 'Bank verification required' WHEN v.bank_details->>'currency_code' <> o.currency_code THEN 'Bank currency does not match settlement' ELSE NULL END AS payout_block_reason,CASE WHEN s.status='scheduled' AND s.due_at<=now() THEN 'due' ELSE s.status END AS display_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE ($1::text IS NULL OR s.vendor_id=$1) ORDER BY s.due_at DESC LIMIT 1000`,[filter]),
   db().query(`SELECT m.*,u.email FROM hash_member m JOIN "user" u ON u.id=m.user_id WHERE ($1::text IS NULL OR vendor_id=$1) AND u.deleted_at IS NULL`,[filter])
  ])
  const user = await req.scope.resolve(Modules.USER).retrieveUser(a.id)
  const products = await catalog(req.scope,filter)
+ const [store]=await req.scope.resolve(Modules.STORE).listStores({}, {relations:["supported_currencies"]})
+ const countries=a.superAdmin?await req.scope.resolve(Modules.REGION).listCountries({}, {take:500}):[]
  const auditRows = a.superAdmin ? (await db().query("SELECT * FROM hash_audit ORDER BY id DESC LIMIT 100")).rows : []
  res.setHeader("Cache-Control","no-store")
- res.json({actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},vendors,products,orders,settlements,members,audit:auditRows,policy:{currency:"INR",split:"50% after full capture / 50% after OTP completion",timing:"T+1 business day, Asia/Kolkata",payout_provider:"manual"}})
+ res.json({actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},countries:countries.map(c=>({code:c.iso_2,name:c.display_name})),vendors:vendors.map(v=>publicVendor(v,a)),currencies:store.supported_currencies.map(c=>c.currency_code),products,orders,settlements,members,audit:auditRows,policy:{currency:"INR",split:"50% after full capture / 50% after OTP completion",timing:"T+1 business day, Asia/Kolkata",payout_provider:"manual"}})
 }
 export async function POST(req: MedusaRequest,res: MedusaResponse) {
  const a = await actor(req), parsed = commands.safeParse(req.body)
@@ -52,7 +55,7 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
  switch(b.action) {
  case "onboard": result=await onboard(req.scope,a,b); break
  case "add_member": result=await addMember(req.scope,a,b); break
- case "save_product": result=await saveProduct(req.scope,a,b); break
+ case "save_product": if(!b.prices&&!b.price_inr)fail("Provide listing prices");result=await saveProduct(req.scope,a,b); break
  case "review_product": result=await reviewProduct(req.scope,a,b); break
  case "verify_otp": result=await verifyOtp(req.scope,a,b.order_id,b.code); break
  case "record_payout": requireHash(a);result=await recordPayout(req.scope,a,b.settlement_id,b.reference);break
@@ -64,6 +67,9 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
  }
  case "vendor_settings": requireHash(a);await transaction(`vendor:${b.vendor_id}`,async c=>{
   const {rowCount}=await c.query("UPDATE hash_vendor SET status=$2,commission_bps=$3,payment_mode=$4,payout_details=$5 WHERE id=$1",[b.vendor_id,b.status,b.commission_bps,b.payment_mode,b.payout_details]);if(!rowCount)fail("Vendor not found")
+  if(b.name)await c.query("UPDATE hash_vendor SET name=$2 WHERE id=$1",[b.vendor_id,b.name])
+  if(b.business_details)await c.query("UPDATE hash_vendor SET business_details=$2 WHERE id=$1",[b.vendor_id,JSON.stringify(b.business_details)])
+  if(b.bank_details){await c.query("UPDATE hash_vendor SET bank_details=$2,bank_verified_at=NULL,bank_verified_by=NULL,bank_revision=bank_revision+1 WHERE id=$1",[b.vendor_id,JSON.stringify(storedBank(b.bank_details))]);await audit(c,a.id,"bank_details_updated",b.vendor_id)}
   await audit(c,a.id,"vendor_settings_updated",b.vendor_id,{status:b.status,commission_bps:b.commission_bps,payment_mode:b.payment_mode})
  });result={ok:true};break
  case "payout_failed": {

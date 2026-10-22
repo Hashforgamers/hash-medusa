@@ -5,6 +5,8 @@ The existing `hfg-user-onboard` service and its database require no changes. Med
 
 Import [the Postman collection](HFG-STORE.postman_collection.json) for the main customer flow. Fill its local environment variables; it contains no credentials.
 
+See [Hash Operations settings](HASH-OPERATIONS.md) for local multi-currency management, public `markets`/`store` bootstrap additions and bank payout requirements. INR/India remains the default.
+
 ## Configuration and identity
 
 Apps should first call unauthenticated `GET /hash-store/config` to fetch the publishable key, region and sales channel dynamically. See [the app bootstrap handoff](HFG-APP-BOOTSTRAP.md) for the complete contract and code example. The base URL is the only required static environment value; the placeholders below are populated from that response.
@@ -17,7 +19,7 @@ MEDUSA_PUBLISHABLE_KEY=<HFG Frontend key from hash:setup:local>
 INDIA_REGION_ID=<India region from hash:setup:local>
 ```
 
-Hosted origin: `https://hash-medusa.onrender.com`. Do not point a frontend at the new auth API there until this change is deployed. IDs and keys differ between local and hosted databases. In the Hash portal, super admins can open **Storefront Integration** to copy the active HFG Frontend publishable key, backend URL, linked sales channels, India region IDs and a frontend handoff. This is also available through authenticated `GET /admin/hash/integration` (Hash super admins only; vendors receive 403). The page reads existing configuration and does not create or rotate keys. Alternatively, find the key in Medusa Admin or setup output; select the INR India region from `GET /store/regions`. Never put admin tokens, Cloudinary secrets or the Medusa JWT signing secret in the frontend.
+Hosted origin: `https://hash-medusa.onrender.com`. Do not point a frontend at the new auth API there until this change is deployed. IDs and keys differ between local and hosted databases. In the Hash portal, super admins can open **Storefront Integration** to copy the active HFG Frontend publishable key, backend URL, linked sales channels, India region IDs and a frontend handoff. This is also available through authenticated `GET /admin/hash/integration` (Hash super admins only; vendors are denied access). The page reads existing configuration and does not create or rotate keys. Alternatively, find the key in Medusa Admin or setup output; select the INR India region from `GET /store/regions`. Never put admin tokens, Cloudinary secrets or the Medusa JWT signing secret in the frontend.
 
 Every `/store/*` request needs `x-publishable-api-key`. Customer-specific requests also need `Authorization: Bearer <MEDUSA_CUSTOMER_TOKEN>`. JSON requests need `Content-Type: application/json`.
 
@@ -84,7 +86,7 @@ x-publishable-api-key: pk_...
 {"products":[{"product_id":"prod_...","vendor_id":"hv_...","vendor_name":"Partner","title":"Gaming session","description":"One hour","kind":"service","variant_id":"variant_...","price_inr":400,"available":5,"thumbnail":"https://res.cloudinary.com/<cloud>/image/upload/..."}],"count":1,"offset":0,"limit":20,"currency_code":"inr"}
 ```
 
-Render `thumbnail` directly as the image URL; do not upload the image again from HFG. Handle empty thumbnails. New partner uploads use Cloudinary URLs; legacy HTTPS images remain readable. Only active vendors' approved/published listings are returned. Use `variant_id`, not `product_id`, to add an item to the cart. `price_inr` is INR major units; settlement ledger fields ending `_paise` are integer paise. Backend prices and inventory are authoritative.
+Render `thumbnail` directly as the image URL; do not upload the image again from HFG. Handle empty thumbnails. New partner uploads use Cloudinary URLs; legacy HTTPS images remain readable. Only active vendors' approved/published listings are returned. Use `variant_id`, not `product_id`, to add an item to the cart. `price_inr` is the legacy INR major-unit price; `prices` lists explicit amounts by currency; settlement ledger fields ending `_paise` are integer minor units of each row’s `currency_code` (paise for INR). Backend prices and inventory are authoritative.
 
 ## Checkout sequence
 
@@ -95,7 +97,7 @@ Render `thumbnail` directly as the image URL; do not upload the image again from
 {"first_name":"Player","last_name":"Name","address_1":"Street address","city":"Mumbai","province":"Maharashtra","postal_code":"400001","country_code":"in","phone":"+919876543210"}
 ```
 
-3. Keep one vendor per cart. If a shopper selects another vendor, offer to start a separate cart. The backend rejects mixed-vendor and non-INR checkout, unavailable listings, and unsupported vendor-direct payment.
+3. Keep one vendor per cart. If a shopper selects another vendor, offer to start a separate cart. The backend rejects mixed-vendor checkout, disabled currencies and items without a price in the selected currency, unavailable listings, and unsupported vendor-direct payment.
 4. Fetch shipping options and add the chosen `option_id`. Local setup has a zero-priced demo option; this is not a production shipping agreement.
 5. Create the payment collection, then a session using the region's configured provider. Integrate that provider's SDK according to `payment_sessions[].data`. Never mark payment successful from a frontend callback alone.
 6. Complete the cart. Only `type:"order"` is successful; surface payment-required/error responses and retain the cart for retry. On timeout, retrieve the cart/order state instead of starting a duplicate purchase.

@@ -1,4 +1,12 @@
 import { createHmac, randomInt, randomBytes, timingSafeEqual } from "crypto"
+export function currencyDigits(currency: string): number {
+  return new Intl.NumberFormat('en', {style:'currency',currency:currency.toUpperCase()}).resolvedOptions().maximumFractionDigits
+}
+export function minorUnits(value: any, currency="inr"): number {
+  const n = Number(value?.value ?? value), scale = 10 ** currencyDigits(currency)
+  if (!Number.isFinite(n) || n < 0 || !Number.isSafeInteger(Math.round(n * scale))) throw new Error("Invalid currency amount")
+  return Math.round(n * scale)
+}
 export function paise(value: any): number {
   const n = Number(value?.value ?? value)
   if (!Number.isFinite(n) || n < 0 || !Number.isSafeInteger(Math.round(n * 100))) throw new Error("Invalid INR amount")

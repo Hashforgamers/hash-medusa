@@ -7,12 +7,12 @@ describe('public storefront bootstrap',()=>{
  async function run(keys:any[]=[key],regions:any[]=[region]){
   const res:any={setHeader:jest.fn(),json:jest.fn(),status:jest.fn()};res.status.mockReturnValue(res)
   const graph=jest.fn().mockResolvedValue({data:keys})
-  await GET({scope:{resolve:(name)=>name===Modules.REGION?{listRegions:async()=>regions}:{graph}}} as any,res)
+  await GET({scope:{resolve:(name)=>name===Modules.REGION?{listRegions:async()=>regions}:name===Modules.STORE?{listStores:async()=>[{name:'Hash Marketplace'}]}:{graph}}} as any,res)
   return res
  }
  test('works without authentication and exposes only public configuration',async()=>{
   const res=await run([{...key,private_field:'do not return'}])
-  expect(res.json).toHaveBeenCalledWith({version:1,publishable_api_key:'pk_public',region_id:'reg_india',sales_channel_id:'sc_hash',currency_code:'inr',country_code:'in'})
+  expect(res.json).toHaveBeenCalledWith({version:1,store:{name:'Hash Marketplace',support_email:'',support_phone:'',returns_policy:'',shipping_policy:''},markets:[{region_id:'reg_india',name:undefined,currency_code:'inr',countries:['in']}],publishable_api_key:'pk_public',region_id:'reg_india',sales_channel_id:'sc_hash',currency_code:'inr',country_code:'in'})
   expect(res.setHeader).toHaveBeenCalledWith('Access-Control-Allow-Origin','*')
   expect(res.setHeader).toHaveBeenCalledWith('Cache-Control','no-store')
  })

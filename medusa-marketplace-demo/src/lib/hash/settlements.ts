@@ -1,6 +1,6 @@
 import { getPayoutAdapter } from "./payouts"
 import { db, transaction, audit } from "./db"
-import { paise, split, nextBusinessDay, newOtp, matchesOtp } from "./policy"
+import { minorUnits, split, nextBusinessDay, newOtp, matchesOtp } from "./policy"
 import { fail, own } from "./access"
 
 const orderFields = ["id","customer_id","status","currency_code","total","items.*","items.tax_lines.*","items.adjustments.*","shipping_methods.*","shipping_methods.tax_lines.*","shipping_methods.adjustments.*","credit_lines.*", "payment_collections.payments.captures.*", "payment_collections.payments.refunds.*"]
@@ -12,14 +12,14 @@ export async function reconcileOrder(container: any, id: string) {
     const ids = [...new Set(order.items.map((i: any) => i.product_id))]
     const { rows: listings } = await c.query(`SELECT l.*, v.commission_bps, v.payment_mode FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id WHERE product_id = ANY($1::text[])`, [ids])
     if (!listings.length) return // Legacy orders outside Hash remain untouched.
-    if (listings.length !== ids.length || new Set(listings.map(l => l.vendor_id)).size !== 1 || order.currency_code !== "inr") throw new Error(`Invalid marketplace order ${id}: expected one vendor and INR`)
-    const total = paise(order.total), vendor = listings[0], amounts = split(total, vendor.commission_bps)
-    await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode)
-      VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode])
+    if (listings.length !== ids.length || new Set(listings.map(l => l.vendor_id)).size !== 1) throw new Error(`Invalid marketplace order ${id}: expected one vendor`)
+    const total = minorUnits(order.total,order.currency_code), vendor = listings[0], amounts = split(total, vendor.commission_bps)
+    await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode,currency_code)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode,order.currency_code])
     const payments = (order.payment_collections || []).flatMap((p: any) => p.payments || [])
     const captures = payments.flatMap((p: any) => p.captures || [])
-    const captured = captures.reduce((s: number, p: any) => s + paise(p.amount),0)
-    const refunded = payments.flatMap((p: any) => p.refunds || []).reduce((s: number,p: any) => s + paise(p.amount),0)
+    const captured = captures.reduce((s: number, p: any) => s + minorUnits(p.amount,order.currency_code),0)
+    const refunded = payments.flatMap((p: any) => p.refunds || []).reduce((s: number,p: any) => s + minorUnits(p.amount,order.currency_code),0)
     const { rows: [saved] } = await c.query("SELECT * FROM hash_order WHERE order_id=$1",[id])
     const hold = order.status === "canceled" && !saved.reviewed_canceled ? "Order canceled" : refunded > 0 && refunded !== Number(saved.reviewed_refund_paise) ? "Refund requires Hash review" : total !== Number(saved.reviewed_total_paise ?? saved.total_paise) ? "Order total changed; review required" : captured < total ? "Awaiting full payment capture" : null
     let paidAt = saved.paid_at
@@ -103,19 +103,21 @@ export async function recordPayout(container: any, a: any, id: string, reference
   if (!row) fail("Settlement not found")
   await reconcileOrder(container,row.order_id)
   return transaction(`order:${row.order_id}`,async c => {
-    const { rows: [s] } = await c.query(`SELECT s.*, o.hold_reason,v.status AS vendor_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE s.id=$1 FOR UPDATE OF s`,[id])
+    const { rows: [s] } = await c.query(`SELECT s.*, o.hold_reason,o.currency_code,v.bank_details,v.bank_verified_at,v.status AS vendor_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE s.id=$1 FOR UPDATE OF s,v`,[id])
     if (s.status === "paid") {
-      if (s.reference === reference.trim()) return s
+      if (s.reference === reference.trim()) return {id:s.id,status:s.status,reference:s.reference,paid_at:s.paid_at}
       fail("Settlement is already paid")
     }
     if (Number(s.amount_paise) <= 0) fail("Nothing is payable for this settlement")
     if (s.status === "processing" || s.hold_reason || s.vendor_status !== "active" || new Date(s.due_at).getTime() > Date.now()) fail("Settlement is not payable yet or is on hold")
+    if(!s.bank_details?.account_number || !s.bank_verified_at)fail("Add and verify the partner bank account before recording payout")
+    if(s.bank_details.currency_code!==s.currency_code)fail("Partner bank currency must match the settlement currency; FX conversion is not configured")
     await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",[`payout-reference:${reference.trim()}`])
     const duplicate=await c.query("SELECT id FROM hash_settlement WHERE provider='manual' AND reference=$1 AND id<>$2",[reference.trim(),id])
     if(duplicate.rows.length)fail("This bank reference is already recorded on another settlement")
-    const result = await getPayoutAdapter("manual").execute({ settlementId:id, amountPaise:Number(s.amount_paise),currency:"INR",vendorId:s.vendor_id,reference })
+    const result = await getPayoutAdapter("manual").execute({ settlementId:id, amountPaise:Number(s.amount_paise),currency:s.currency_code.toUpperCase(),vendorId:s.vendor_id,reference })
     await c.query("UPDATE hash_settlement SET status=$2,reference=$3,paid_at=now(),failure_reason=NULL WHERE id=$1",[id,result.status,result.reference])
-    await audit(c,a.id,"manual_payout_recorded",id,{ reference:result.reference,amount_paise:s.amount_paise })
+    await audit(c,a.id,"manual_payout_recorded",id,{ reference:result.reference,amount_paise:s.amount_paise,currency_code:s.currency_code,account_last4:s.bank_details.account_number.slice(-4) })
     return { id,...result }
   })
 }
@@ -140,7 +142,7 @@ export async function reviewAdjustment(container: any,a: any,orderId: string,not
       await c.query("UPDATE hash_settlement SET amount_paise=$2 WHERE id=$1",[s.id,amount])
       remaining-=amount
     }
-    await c.query("UPDATE hash_order SET net_paise=$2,reviewed_refund_paise=refunded_paise,reviewed_canceled=$3,recovery_paise=$4,reviewed_total_paise=$5,hold_reason=NULL WHERE order_id=$1",[orderId,net,order.status==="canceled",Math.max(0,paid-net),paise(order.total)])
+    await c.query("UPDATE hash_order SET net_paise=$2,reviewed_refund_paise=refunded_paise,reviewed_canceled=$3,recovery_paise=$4,reviewed_total_paise=$5,hold_reason=NULL WHERE order_id=$1",[orderId,net,order.status==="canceled",Math.max(0,paid-net),minorUnits(order.total,order.currency_code)])
     await audit(c,a.id,"refund_settlement_adjusted",orderId,{note,net_paise:net,recovery_paise:Math.max(0,paid-net)})
     return {net_paise:net,recovery_paise:Math.max(0,paid-net)}
   })

@@ -24,6 +24,11 @@ export async function migrate() {
     payment_mode text NOT NULL DEFAULT 'hash_collects' CHECK(payment_mode IN ('hash_collects','vendor_direct')),
     payout_details text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now()
   );
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS business_details jsonb NOT NULL DEFAULT '{}';
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_details jsonb NOT NULL DEFAULT '{}';
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_revision integer NOT NULL DEFAULT 0;
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_verified_at timestamptz;
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_verified_by text;
   CREATE TABLE IF NOT EXISTS hash_member (
     user_id text PRIMARY KEY, vendor_id text NOT NULL REFERENCES hash_vendor(id),
     role text NOT NULL CHECK(role IN ('owner','staff'))
@@ -44,6 +49,7 @@ export async function migrate() {
     otp_attempts integer NOT NULL DEFAULT 0, otp_locked_until timestamptz,
     created_at timestamptz NOT NULL DEFAULT now()
   );
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS currency_code text NOT NULL DEFAULT 'inr';
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS reviewed_total_paise bigint;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS reviewed_refund_paise bigint NOT NULL DEFAULT -1;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS reviewed_canceled boolean NOT NULL DEFAULT false;

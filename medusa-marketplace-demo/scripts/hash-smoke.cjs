@@ -3,12 +3,15 @@ const base=process.env.HASH_TEST_URL||'http://localhost:9000';
 if(!['localhost','127.0.0.1'].includes(new URL(base).hostname))throw new Error('These fixtures may only run locally');
 async function req(path,method='GET',body,token,expected=200,key){const r=await fetch(base+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(key?{'x-publishable-api-key':key}:{})},...(body?{body:JSON.stringify(body)}:{})});let data;const raw=await r.text();try{data=JSON.parse(raw)}catch{data={raw}}assert.equal(r.status,expected,`${method} ${path}: ${JSON.stringify(data)}`);return data;}
 (async()=>{
- const admin=JSON.parse(fs.readFileSync('.local/hash-admin.json'));
+ const admin=JSON.parse(fs.readFileSync(process.env.HASH_TEST_ADMIN_FILE||'.local/hash-admin.json'));
  const {token}=await req('/auth/user/emailpass','POST',admin);
  let state=await req('/admin/hash','GET',null,token);assert.equal(state.actor.superAdmin,true);
  const suffix=Date.now();
- const v1=(await req('/admin/hash','POST',{action:'onboard',name:'QA Vendor A '+suffix,email:`qa-a-${suffix}@example.test`},token)).result;
+ const bank={account_holder:'QA Test Beneficiary',bank_name:'QA Test Bank',account_number:'000012345678',account_number_confirmation:'000012345678',account_type:'current',country_code:'in',currency_code:'inr',ifsc:'TEST0123456'};
+ const v1=(await req('/admin/hash','POST',{action:'onboard',name:'QA Vendor A '+suffix,bank_details:bank,email:`qa-a-${suffix}@example.test`},token)).result;
  const v2=(await req('/admin/hash','POST',{action:'onboard',name:'QA Vendor B '+suffix,email:`qa-b-${suffix}@example.test`},token)).result;
+ const review=await req('/admin/hash/bank','POST',{action:'view',vendor_id:v1.vendor_id,note:'Local QA bank review'},token);
+ await req('/admin/hash/bank','POST',{action:'verify',vendor_id:v1.vendor_id,revision:review.revision,note:'Local QA bank verification'},token);
  const login=async v=>(await req('/auth/user/emailpass','POST',{email:v.email,password:v.temporary_password})).token;
  const t1=await login(v1),t2=await login(v2);
  for(const [v,t] of [[v1,t1],[v2,t2]])await req('/admin/hash','POST',{action:'change_password',current_password:v.temporary_password,new_password:v.temporary_password+'-new'},t);

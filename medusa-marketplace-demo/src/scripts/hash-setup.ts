@@ -7,8 +7,8 @@ export default async function setup({container}:any) {
  const storeService=container.resolve(Modules.STORE),fulfillment=container.resolve(Modules.FULFILLMENT),link=container.resolve("link")
  let [channel]=await container.resolve(Modules.SALES_CHANNEL).listSalesChannels({name:"Hash Marketplace"})
  if(!channel){const {result}=await createSalesChannelsWorkflow(container).run({input:{salesChannelsData:[{name:"Hash Marketplace"}]}});channel=result[0]}
- const [store]=await storeService.listStores()
- await updateStoresWorkflow(container).run({input:{selector:{id:store.id},update:{name:"Hash Marketplace",supported_currencies:[{currency_code:"inr",is_default:true}],default_sales_channel_id:channel.id}}})
+ const [store]=await storeService.listStores({}, {relations:["supported_currencies"]})
+ await updateStoresWorkflow(container).run({input:{selector:{id:store.id},update:{name:store.name||"Hash Marketplace",supported_currencies:[...store.supported_currencies.filter(c=>c.currency_code!=="inr").map(c=>({currency_code:c.currency_code,is_default:false})),{currency_code:"inr",is_default:true}],default_sales_channel_id:channel.id}}})
  let [region]=await container.resolve(Modules.REGION).listRegions({currency_code:"inr"})
  if(!region){const {result}=await createRegionsWorkflow(container).run({input:{regions:[{name:"India",currency_code:"inr",countries:["in"],payment_providers:["pp_system_default"]}]}});region=result[0]}
  let [profile]=await fulfillment.listShippingProfiles({type:"default"})

@@ -91,4 +91,4 @@ Share these files with the app team together:
 - `docs/HFG-STORE-API.md` — catalog, identity, cart, shipping, checkout, payment, order and OTP contracts.
 - `docs/HFG-STORE.postman_collection.json` — runnable requests; set the base URL and copy configuration values from the bootstrap response.
 
-Only one vendor per cart; INR only. Real-money checkout requires a payment provider integration; the current demo payment provider does not collect real money.
+Only one vendor per cart; INR/India remains the default. The local Operations Settings change adds a `markets` array and public `store` details to this response; see [Hash Operations](HASH-OPERATIONS.md). Use the chosen region ID for market-specific pricing and checkout; there is no automatic currency conversion. Real-money checkout requires a payment provider integration; the current demo payment provider does not collect real money.
