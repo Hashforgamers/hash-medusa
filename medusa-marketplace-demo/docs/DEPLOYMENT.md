@@ -39,3 +39,18 @@ Set `HASH_DEMO_MODE=true` to explicitly allow in-memory processing without Redis
 - Redis: none in demo mode; no new paid Render resources.
 
 Hosted data starts fresh; local demo vendors and products were not copied. Credentials remain in private, gitignored local handoff files and deployment environment settings.
+
+## Automatic main-branch release workflow
+
+`.github/workflows/main-deploy.yml` runs on **every push to main**, including merges and direct pushes, with no path filters. Pull requests run validation only. Manual reruns are available in GitHub Actions. Validation runs TypeScript, unit and settlement-policy tests, the Medusa build, generated-portal consistency, and the static Vercel portal build. No production database credentials are needed by CI.
+
+One-time activation (not configured by adding these files alone):
+
+1. Render `hash-medusa` → Settings → Deploy Hook: save its URL as repository Actions secret `RENDER_DEPLOY_HOOK`.
+2. Vercel `hash-partners` → Settings → Git → Deploy Hooks: create a hook targeting **main** and save its URL as `VERCEL_DEPLOY_HOOK`.
+3. Disable Render's automatic Git deploys so the workflow is the single deployment trigger. For Vercel, use an Ignored Build Step to skip automatic Git builds as described in Vercel's current deploy-hook documentation; verify hook-triggered builds still run. Do not set `github.enabled=false`, which also disables deploy hooks.
+4. Push this workflow to GitHub main. Verify the first Actions run and both provider deployments. Missing secrets deliberately fail the deployment job; they do not silently skip deployment.
+
+The deploy job sends Render the validated commit SHA. Vercel's hook deploys the latest commit on its configured main branch; a push during execution may advance that ref. Releases are serialized and obsolete queued commits are skipped, but the two providers are not an atomic release. Keep backend and portal changes backward-compatible. A successful trigger means the hosting service accepted the request; provider builds, migrations and health checks can still fail. Use Render/Vercel deployment notifications for those failures and GitHub Actions notifications for failed checks/triggers. No paid services or new databases are provisioned by this workflow.
+
+References: [Render deploy hooks](https://render.com/docs/deploy-hooks), [Vercel deploy hooks](https://vercel.com/docs/deploy-hooks).

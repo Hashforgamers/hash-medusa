@@ -1,0 +1,58 @@
+name: Validate and deploy main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hash-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: medusa-marketplace-demo
+    env:
+      HASH_DEMO_MODE: 'true'
+      HASH_BACKEND_URL: https://hash-medusa.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: medusa-marketplace-demo/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npm run test:unit
+      - run: npm run test:hash:policy
+      - run: npm run build
+      - name: Check generated portal is committed
+        run: git diff --exit-code -- src/api/hash-portal/route.ts
+      - name: Build Vercel portal
+        run: node scripts/hash-build-vercel.cjs
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Trigger production deployments
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: node scripts/trigger-deploy.cjs
