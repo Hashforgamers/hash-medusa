@@ -1,4 +1,4 @@
-name: Validate and deploy main
+name: Main release checks
 
 on:
   push:
@@ -41,18 +41,5 @@ jobs:
       - name: Build Vercel portal
         run: node scripts/hash-build-vercel.cjs
 
-  deploy:
-    needs: validate
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Trigger production deployments
-        env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
-        run: node scripts/trigger-deploy.cjs
+# Render waits for these checks; Vercel deploys main via its GitHub integration.
+# No deploy-hook secrets are required. See docs/DEPLOYMENT.md.

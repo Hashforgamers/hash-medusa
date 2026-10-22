@@ -2,7 +2,7 @@
 
 ## Render backend
 
-Create a separate Docker web service from `Hashforgamers/hash-medusa`, branch `main`. Set the root directory to `medusa-marketplace-demo`, Dockerfile to `./Dockerfile`, and health check path to `/health`. The Docker command runs migrations, idempotent Hash setup, then Medusa. Use a single instance during initial setup.
+Create a separate Docker web service from `Hashforgamers/hash-medusa`, branch `main`. Leave Root Directory empty, set Dockerfile to `./medusa-marketplace-demo/Dockerfile`, Docker Build Context Directory to `./medusa-marketplace-demo`, and health check path to `/health`. This lets changes anywhere in the repository trigger deployment. The Docker command runs migrations, idempotent Hash setup, then Medusa. Use a single instance during initial setup.
 
 Use dedicated persistent PostgreSQL and Redis resources in the same Render region. Set `DATABASE_URL` and `REDIS_URL` to their internal connection URLs. Set `NODE_ENV=production`, `PORT=9000`, and independent cryptographically random values of at least 32 characters for `JWT_SECRET`, `COOKIE_SECRET`, and `HASH_OTP_SECRET`.
 
@@ -40,17 +40,18 @@ Set `HASH_DEMO_MODE=true` to explicitly allow in-memory processing without Redis
 
 Hosted data starts fresh; local demo vendors and products were not copied. Credentials remain in private, gitignored local handoff files and deployment environment settings.
 
-## Automatic main-branch release workflow
+## Automatic main-branch releases
 
-`.github/workflows/main-deploy.yml` runs on **every push to main**, including merges and direct pushes, with no path filters. Pull requests run validation only. Manual reruns are available in GitHub Actions. Validation runs TypeScript, unit and settlement-policy tests, the Medusa build, generated-portal consistency, and the static Vercel portal build. No production database credentials are needed by CI.
+Every merge or direct push to `main` runs `.github/workflows/main-deploy.yml`, without path filters. Pull requests run the same validation; manual runs are also available. Checks include TypeScript, unit and settlement-policy tests, the Medusa build, generated-portal consistency, and the Vercel portal build.
 
-One-time activation (not configured by adding these files alone):
+Hosting uses the existing GitHub integrations, not deploy hooks:
 
-1. Render `hash-medusa` → Settings → Deploy Hook: save its URL as repository Actions secret `RENDER_DEPLOY_HOOK`.
-2. Vercel `hash-partners` → Settings → Git → Deploy Hooks: create a hook targeting **main** and save its URL as `VERCEL_DEPLOY_HOOK`.
-3. Disable Render's automatic Git deploys so the workflow is the single deployment trigger. For Vercel, use an Ignored Build Step to skip automatic Git builds as described in Vercel's current deploy-hook documentation; verify hook-triggered builds still run. Do not set `github.enabled=false`, which also disables deploy hooks.
-4. Push this workflow to GitHub main. Verify the first Actions run and both provider deployments. Missing secrets deliberately fail the deployment job; they do not silently skip deployment.
+- **Render / hash-medusa:** linked to `main`, Auto-Deploy **After CI Checks Pass**. Render starts its backend deployment after the commit checks succeed, including the Vercel check. Its Docker startup runs database migrations and idempotent Hash setup.
+- **Vercel / hash-partners:** production branch `main`; automatically builds and deploys pushes through its GitHub integration. This runs independently of Actions; it does not wait for the backend checks.
+- No `RENDER_DEPLOY_HOOK`, `VERCEL_DEPLOY_HOOK`, hosting API token, or production database secret is required in GitHub Actions.
 
-The deploy job sends Render the validated commit SHA. Vercel's hook deploys the latest commit on its configured main branch; a push during execution may advance that ref. Releases are serialized and obsolete queued commits are skipped, but the two providers are not an atomic release. Keep backend and portal changes backward-compatible. A successful trigger means the hosting service accepted the request; provider builds, migrations and health checks can still fail. Use Render/Vercel deployment notifications for those failures and GitHub Actions notifications for failed checks/triggers. No paid services or new databases are provisioned by this workflow.
+Check GitHub Actions for validation and each hosting dashboard for rollout status. A green Actions run is not confirmation that the backend rollout has finished. Releases across the two providers are not atomic, so keep portal/backend changes backward-compatible. The free Render instance can take time to wake up. Existing provider account/billing restrictions still apply.
 
-References: [Render deploy hooks](https://render.com/docs/deploy-hooks), [Vercel deploy hooks](https://vercel.com/docs/deploy-hooks).
+The old hook-based deploy job was removed because it duplicated the connected hosting integrations and failed without optional secrets. Its historical failed run remains in GitHub; use the newest main-branch run for current status.
+
+References: [Render automatic deploys](https://render.com/docs/deploys#automatic-deploys), [Vercel Git deployments](https://vercel.com/docs/git).
