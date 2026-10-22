@@ -28,6 +28,7 @@ export async function onboard(container: any, a: any, b: any) {
   const id = `hv_${randomUUID()}`, password = randomBytes(18).toString("base64url")
   return transaction(`email:${b.email}`,async c => {
     await c.query("INSERT INTO hash_vendor(id,name,commission_bps,payment_mode,payout_details,business_details,bank_details) VALUES($1,$2,$3,$4,$5,$6,$7)",[id,b.name,b.commission_bps,b.payment_mode,b.payout_details,JSON.stringify(b.business_details||{}),JSON.stringify(b.bank_details?storedBank(b.bank_details):{})])
+    if(b.settlement_plan_id){if(!(await c.query('SELECT 1 FROM hash_settlement_plan WHERE id=$1 AND active',[b.settlement_plan_id])).rowCount)fail('Choose an active settlement plan');await c.query('UPDATE hash_vendor SET settlement_plan_id=$2 WHERE id=$1',[id,b.settlement_plan_id])}
     const user = await createAccount(container,b.email,password,{ hash_password_change_required:true })
     try {
       await c.query("INSERT INTO hash_member(user_id,vendor_id,role) VALUES($1,$2,'owner')",[user.id,id])

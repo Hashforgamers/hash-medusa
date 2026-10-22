@@ -2,6 +2,8 @@ import { defineMiddlewares, authenticate } from "@medusajs/framework/http"
 import { actor, fail } from "../lib/hash/access"
 import { db } from "../lib/hash/db"
 export default defineMiddlewares({routes:[
+ {matcher:"/hash-webhooks/razorpay/:mode",method:"POST",bodyParser:{preserveRawBody:true,sizeLimit:"256kb"}},
+ {matcher:"/store/hash/subscriptions*",middlewares:[authenticate("customer",["session","bearer"])]},
  {matcher:"/admin/hash/images",method:"POST",bodyParser:{sizeLimit:"8mb"}},
  {matcher:"/auth/user/hfg*",middlewares:[(_req,res)=>res.status(403).json({message:"HFG login is for store customers only"})]},
  {matcher:"/admin/*",middlewares:[authenticate("user",["session","bearer"]),async(req:any,res,next)=>{

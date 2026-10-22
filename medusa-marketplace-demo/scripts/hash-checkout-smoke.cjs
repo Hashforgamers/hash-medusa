@@ -44,7 +44,7 @@ async function req(path,method='GET',body,token,expected=200){const r=await fetc
  await req('/admin/hash','POST',{action:'verify_otp',order_id:order.id,code:otp.code},f.t1);
  await req('/admin/hash','POST',{action:'verify_otp',order_id:order.id,code:otp.code},f.t1);
  await req('/admin/hash','POST',{action:'reconcile'},f.token);
- state=await req('/admin/hash','GET',null,f.token);let settlements=state.settlements.filter(s=>s.order_id===order.id);assert.equal(settlements.length,2);assert.equal(settlements.reduce((n,s)=>n+Number(s.amount_paise),0),100101);
+ state=await req('/admin/hash','GET',null,f.token);let settlements=state.settlements.filter(s=>s.order_id===order.id).sort((a,b)=>a.milestone===b.milestone?0:a.milestone==='payment'?-1:1);assert.equal(settlements.length,2);assert.equal(settlements.reduce((n,s)=>n+Number(s.amount_paise),0),100101);const captureBps=state.orders.find(o=>o.order_id===order.id).settlement_plan.capture_bps;assert.equal(Number(settlements.find(s=>s.milestone==='payment').amount_paise),Math.floor(100101*captureBps/10000));
  await req('/admin/hash','POST',{action:'record_payout',settlement_id:settlements[0].id,reference:'QA-'+suffix},f.token,400);
  // Test fixture only: bring the due date forward to exercise manual transfer recording.
  await db.query("UPDATE hash_settlement SET due_at=now()-interval '1 minute' WHERE order_id=$1",[order.id]);

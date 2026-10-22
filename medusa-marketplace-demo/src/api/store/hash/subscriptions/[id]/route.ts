@@ -1,0 +1,5 @@
+import { z } from 'zod'
+import { db } from '../../../../../lib/hash/db'
+import { manageEnrollment,publicEnrollment } from '../../../../../lib/hash/razorpay-billing'
+export async function GET(req:any,res:any){const {rows:[s]}=await db().query('SELECT * FROM hash_subscription WHERE id=$1 AND customer_id=$2',[req.params.id,req.auth_context.actor_id]);if(!s)return res.status(404).json({message:'Subscription not found'});res.setHeader('Cache-Control','no-store');const {rows:payments}=await db().query('SELECT payment_id,amount_minor,currency,status,refunded_minor FROM hash_billing_payment WHERE subscription_id=$1 ORDER BY updated_at DESC LIMIT 100',[s.id]);res.json({subscription:publicEnrollment(s),payments})}
+export async function POST(req:any,res:any){const p=z.object({action:z.enum(['refresh','cancel'])}).safeParse(req.body);if(!p.success)return res.status(400).json({message:'Choose refresh or cancel'});res.json({subscription:await manageEnrollment(req.auth_context.actor_id,req.params.id,p.data.action)})}

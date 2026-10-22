@@ -79,3 +79,7 @@ The app should keep the top-level INR/India values as the default, offer only co
 Run normal Hash setup before starting the updated server; deployment already runs it. Migration adds business/bank/review fields to `hash_vendor` and `currency_code DEFAULT 'inr'` to `hash_order`. Setup now preserves enabled store currencies and custom store name across restarts. No user-onboarding service or database changes are required.
 
 Validated locally: settings API; currency/region creation and updates; delivery rate create/update; location creation; structured onboarding; masking; bank verification/reset/stale-review rejection; multi-currency listing; USD checkout with shipping, capture, OTP, 50/50 settlement rounding, currency mismatch rejection and idempotent manual payout. Unit tests additionally cover zero-/two-/three-decimal currencies and permissions.
+
+## Configurable finance extension
+
+See [Hash finance guide](HASH-FINANCE.md) for editable settlement plans, payout connectors, Razorpay customer plans and the subscription API. The fixed 50/50 wording above describes the seeded legacy plan only; new orders use their assigned plan snapshot. Customer recurring plans are standalone billing agreements, not instalment checkout for Medusa carts.

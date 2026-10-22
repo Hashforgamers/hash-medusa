@@ -151,3 +151,7 @@ References: https://cloudinary.com/documentation/upload_images and the installed
 ## Local verification in this change
 
 TypeScript and Medusa production build passed. Twelve upload/identity/access tests and the existing financial-policy tests passed. Local API checks verified invalid HFG sessions return 401, HFG provider cannot sign in administrators (403), and anonymous image uploads return 401. Cloudinary network calls and HFG upstream identity responses were mocked in unit tests; no hosted resources or real images were uploaded. The existing full checkout smoke script could not log in with the saved local admin credentials (401); those credentials were not reset. A full real-account checkout/upload test remains part of rollout QA.
+
+## Configurable finance extension
+
+See [Hash finance guide](HASH-FINANCE.md) for editable settlement plans, payout connectors, Razorpay customer plans and the subscription API. The fixed 50/50 wording above describes the seeded legacy plan only; new orders use their assigned plan snapshot. Customer recurring plans are standalone billing agreements, not instalment checkout for Medusa carts.

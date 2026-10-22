@@ -1,6 +1,7 @@
+import { selectedPlan, allocation, dueDate } from "./settlement-plans"
 import { getPayoutAdapter } from "./payouts"
 import { db, transaction, audit } from "./db"
-import { minorUnits, split, nextBusinessDay, newOtp, matchesOtp } from "./policy"
+import { minorUnits, split, newOtp, matchesOtp } from "./policy"
 import { fail, own } from "./access"
 
 const orderFields = ["id","customer_id","status","currency_code","total","items.*","items.tax_lines.*","items.adjustments.*","shipping_methods.*","shipping_methods.tax_lines.*","shipping_methods.adjustments.*","credit_lines.*", "payment_collections.payments.captures.*", "payment_collections.payments.refunds.*"]
@@ -14,8 +15,8 @@ export async function reconcileOrder(container: any, id: string) {
     if (!listings.length) return // Legacy orders outside Hash remain untouched.
     if (listings.length !== ids.length || new Set(listings.map(l => l.vendor_id)).size !== 1) throw new Error(`Invalid marketplace order ${id}: expected one vendor`)
     const total = minorUnits(order.total,order.currency_code), vendor = listings[0], amounts = split(total, vendor.commission_bps)
-    await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode,currency_code)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode,order.currency_code])
+    await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode,currency_code,settlement_plan)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode,order.currency_code,JSON.stringify(await selectedPlan(c,vendor.vendor_id))])
     const payments = (order.payment_collections || []).flatMap((p: any) => p.payments || [])
     const captures = payments.flatMap((p: any) => p.captures || [])
     const captured = captures.reduce((s: number, p: any) => s + minorUnits(p.amount,order.currency_code),0)
@@ -29,8 +30,8 @@ export async function reconcileOrder(container: any, id: string) {
     }
     await c.query("UPDATE hash_order SET captured_paise=$2, refunded_paise=$3, hold_reason=$4, paid_at=$5 WHERE order_id=$1",[id,captured,refunded,hold,paidAt])
     if (paidAt && saved.payment_mode === "hash_collects") {
-      await schedule(c, saved, "payment", Math.floor(Number(saved.net_paise)/2), paidAt)
-      if (saved.completed_at) await schedule(c,saved,"completion",Number(saved.net_paise)-Math.floor(Number(saved.net_paise)/2),saved.completed_at)
+      await schedule(c, saved, "payment", allocation(Number(saved.net_paise),saved.settlement_plan).payment, paidAt)
+      if (saved.completed_at) await schedule(c,saved,"completion",Number(saved.net_paise)-allocation(Number(saved.net_paise),saved.settlement_plan).payment,saved.completed_at)
     }
   })
 }
@@ -39,9 +40,10 @@ async function schedule(c: any, order: any, milestone: string, amount: number, a
     const {rows:[first]}=await c.query("SELECT amount_paise FROM hash_settlement WHERE order_id=$1 AND milestone='payment'",[order.order_id])
     amount=Math.max(0,Number(order.net_paise)-Number(first?.amount_paise || 0))
   }
+  if(amount===0)return
   await c.query(`INSERT INTO hash_settlement(id,order_id,vendor_id,milestone,amount_paise,due_at)
     VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(order_id,milestone) DO NOTHING`,
-    [`${order.order_id}_${milestone}`,order.order_id,order.vendor_id,milestone,amount,nextBusinessDay(new Date(at))])
+    [`${order.order_id}_${milestone}`,order.order_id,order.vendor_id,milestone,amount,dueDate(new Date(at),order.settlement_plan,milestone as "payment"|"completion")])
 }
 export async function reconcileAll(container: any) {
   let skip = 0
@@ -90,7 +92,7 @@ export async function verifyOtp(container: any, a: any, orderId: string, code: s
     }
     const completed = new Date()
     await c.query("UPDATE hash_order SET completed_at=$2,otp_hash=NULL,otp_nonce=NULL WHERE order_id=$1",[orderId,completed])
-    if (o.payment_mode === "hash_collects") await schedule(c,o,"completion",Number(o.net_paise)-Math.floor(Number(o.net_paise)/2),completed)
+    if (o.payment_mode === "hash_collects") await schedule(c,o,"completion",Number(o.net_paise)-allocation(Number(o.net_paise),o.settlement_plan).payment,completed)
     await audit(c,a.id,"completion_verified",orderId)
     return { completed_at: completed }
   })
@@ -104,6 +106,7 @@ export async function recordPayout(container: any, a: any, id: string, reference
   await reconcileOrder(container,row.order_id)
   return transaction(`order:${row.order_id}`,async c => {
     const { rows: [s] } = await c.query(`SELECT s.*, o.hold_reason,o.currency_code,v.bank_details,v.bank_verified_at,v.status AS vendor_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE s.id=$1 FOR UPDATE OF s,v`,[id])
+    if(s.provider!=="manual" && s.status!=="failed")fail("Use the provider transfer review for this settlement")
     if (s.status === "paid") {
       if (s.reference === reference.trim()) return {id:s.id,status:s.status,reference:s.reference,paid_at:s.paid_at}
       fail("Settlement is already paid")
@@ -116,7 +119,7 @@ export async function recordPayout(container: any, a: any, id: string, reference
     const duplicate=await c.query("SELECT id FROM hash_settlement WHERE provider='manual' AND reference=$1 AND id<>$2",[reference.trim(),id])
     if(duplicate.rows.length)fail("This bank reference is already recorded on another settlement")
     const result = await getPayoutAdapter("manual").execute({ settlementId:id, amountPaise:Number(s.amount_paise),currency:s.currency_code.toUpperCase(),vendorId:s.vendor_id,reference })
-    await c.query("UPDATE hash_settlement SET status=$2,reference=$3,paid_at=now(),failure_reason=NULL WHERE id=$1",[id,result.status,result.reference])
+    await c.query("UPDATE hash_settlement SET status=$2,reference=$3,paid_at=now(),failure_reason=NULL,provider='manual' WHERE id=$1",[id,result.status,result.reference])
     await audit(c,a.id,"manual_payout_recorded",id,{ reference:result.reference,amount_paise:s.amount_paise,currency_code:s.currency_code,account_last4:s.bank_details.account_number.slice(-4) })
     return { id,...result }
   })
@@ -138,7 +141,7 @@ export async function reviewAdjustment(container: any,a: any,orderId: string,not
     for(const milestone of ["payment","completion"]){
       const s=settlements.find(s=>s.milestone===milestone)
       if(!s || s.status==="paid")continue
-      const amount=milestone==="payment"?Math.min(remaining,Math.floor(net/2)):remaining
+      const amount=milestone==="payment"?Math.min(remaining,allocation(net,o.settlement_plan).payment):remaining
       await c.query("UPDATE hash_settlement SET amount_paise=$2 WHERE id=$1",[s.id,amount])
       remaining-=amount
     }

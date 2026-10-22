@@ -17,6 +17,7 @@ export async function audit(c: any, actor: string, action: string, entity: strin
   await c.query("INSERT INTO hash_audit(actor, action, entity_id, detail) VALUES($1,$2,$3,$4)", [actor, action, entity, JSON.stringify(detail)])
 }
 export async function migrate() {
+  const {rows:[existing]}=await db().query("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='hash_order' AND column_name='settlement_plan') AS ready")
   await db().query(`
   CREATE TABLE IF NOT EXISTS hash_vendor (
     id text PRIMARY KEY, name text NOT NULL, status text NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended')),
@@ -29,6 +30,18 @@ export async function migrate() {
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_revision integer NOT NULL DEFAULT 0;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_verified_at timestamptz;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_verified_by text;
+  CREATE TABLE IF NOT EXISTS hash_settlement_plan (
+    id text PRIMARY KEY, revision integer NOT NULL DEFAULT 1, definition jsonb NOT NULL,
+    active boolean NOT NULL DEFAULT true, is_default boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now()
+  );
+  INSERT INTO hash_settlement_plan(id,definition,is_default) VALUES('default','{"name":"Standard 50/50","capture_bps":5000,"capture_delay":1,"completion_delay":1,"day_type":"business","timezone":"Asia/Kolkata","weekend":[0,6],"holidays":[]}',true) ON CONFLICT(id) DO NOTHING;
+  CREATE UNIQUE INDEX IF NOT EXISTS hash_one_default_plan ON hash_settlement_plan(is_default) WHERE is_default;
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS settlement_plan_id text REFERENCES hash_settlement_plan(id);
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS payout_provider_id text NOT NULL DEFAULT 'manual';
+  CREATE TABLE IF NOT EXISTS hash_payout_provider (
+    id text PRIMARY KEY, name text NOT NULL, revision integer NOT NULL DEFAULT 1, config jsonb NOT NULL,
+    secret_encrypted text, active boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now()
+  );
   CREATE TABLE IF NOT EXISTS hash_member (
     user_id text PRIMARY KEY, vendor_id text NOT NULL REFERENCES hash_vendor(id),
     role text NOT NULL CHECK(role IN ('owner','staff'))
@@ -54,6 +67,7 @@ export async function migrate() {
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS reviewed_refund_paise bigint NOT NULL DEFAULT -1;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS reviewed_canceled boolean NOT NULL DEFAULT false;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS recovery_paise bigint NOT NULL DEFAULT 0;
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS settlement_plan jsonb NOT NULL DEFAULT '{"id":"legacy","revision":1,"name":"Legacy 50/50","capture_bps":5000,"capture_delay":1,"completion_delay":1,"day_type":"business","timezone":"Asia/Kolkata","weekend":[0,6],"holidays":[]}';
   CREATE TABLE IF NOT EXISTS hash_settlement (
     id text PRIMARY KEY, order_id text NOT NULL REFERENCES hash_order(order_id),
     vendor_id text NOT NULL REFERENCES hash_vendor(id), milestone text NOT NULL CHECK(milestone IN ('payment','completion')),
@@ -63,6 +77,39 @@ export async function migrate() {
     UNIQUE(order_id,milestone)
   );
   CREATE UNIQUE INDEX IF NOT EXISTS hash_payout_reference ON hash_settlement(provider, reference) WHERE reference IS NOT NULL;
+  CREATE TABLE IF NOT EXISTS hash_customer_plan (
+    id text PRIMARY KEY, revision integer NOT NULL DEFAULT 1, definition jsonb NOT NULL,
+    active boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now()
+  );
+  ALTER TABLE hash_customer_plan ADD COLUMN IF NOT EXISTS razorpay_plan_id text;
+  ALTER TABLE hash_customer_plan ADD COLUMN IF NOT EXISTS razorpay_mode text;
+  ALTER TABLE hash_customer_plan ADD COLUMN IF NOT EXISTS razorpay_key_id text;
+  CREATE TABLE IF NOT EXISTS hash_razorpay_config (
+    mode text PRIMARY KEY CHECK(mode IN ('test','live')), key_id text NOT NULL, secret_encrypted text NOT NULL,
+    webhook_encrypted text NOT NULL, active boolean NOT NULL DEFAULT false, verified_at timestamptz,
+    webhook_seen_at timestamptz, revision integer NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS hash_subscription (
+    id text PRIMARY KEY, customer_id text NOT NULL, plan_id text NOT NULL REFERENCES hash_customer_plan(id),
+    plan_revision integer NOT NULL, definition jsonb NOT NULL, mode text NOT NULL, key_id text NOT NULL,
+    remote_id text UNIQUE, status text NOT NULL DEFAULT 'creating', checkout_url text,
+    request_key text NOT NULL, current_start bigint,current_end bigint,paid_count integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(customer_id,request_key)
+  );
+  CREATE TABLE IF NOT EXISTS hash_billing_payment (
+    payment_id text PRIMARY KEY, subscription_id text NOT NULL REFERENCES hash_subscription(id),
+    amount_minor bigint NOT NULL,currency text NOT NULL,status text NOT NULL,refunded_minor bigint NOT NULL DEFAULT 0,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE IF NOT EXISTS hash_billing_event (
+    id text PRIMARY KEY,mode text NOT NULL,event text NOT NULL,created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE IF NOT EXISTS hash_payout_attempt (
+    id text PRIMARY KEY, settlement_id text NOT NULL REFERENCES hash_settlement(id), provider_id text NOT NULL,
+    provider_revision integer NOT NULL, status text NOT NULL CHECK(status IN ('processing','paid','not_sent')),
+    reference text, created_at timestamptz NOT NULL DEFAULT now(), resolved_at timestamptz
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS hash_one_open_payout ON hash_payout_attempt(settlement_id) WHERE status='processing';
   CREATE TABLE IF NOT EXISTS hash_audit (
     id bigserial PRIMARY KEY, actor text NOT NULL, action text NOT NULL, entity_id text NOT NULL,
     detail jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
@@ -71,4 +118,9 @@ export async function migrate() {
   CREATE INDEX IF NOT EXISTS hash_order_vendor ON hash_order(vendor_id);
   CREATE INDEX IF NOT EXISTS hash_settlement_due ON hash_settlement(status,due_at);
   `)
+  if(!existing.ready){
+    const holidays=(process.env.HASH_SETTLEMENT_HOLIDAYS||'').split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s))
+    await db().query("UPDATE hash_order SET settlement_plan=jsonb_set(settlement_plan,'{holidays}',$1::jsonb) WHERE settlement_plan->>'id'='legacy'",[JSON.stringify(holidays)])
+    await db().query("UPDATE hash_settlement_plan SET definition=jsonb_set(definition,'{holidays}',$1::jsonb) WHERE id='default' AND revision=1",[JSON.stringify(holidays)])
+  }
 }
