@@ -29,6 +29,7 @@ Enable automatic capture in the Razorpay account. Checkout completion rejects me
 - Shipping options without cart_id: HTTP 400, 0.89 s, `Invalid request: Field 'cart_id' is required`.
 - India providers: HTTP 200, only `pp_system_default` before rollout.
 - Render events: startup failures at 08:36 and 08:38 Warsaw time, recovery at 08:41. Logs identify database TCP connection timeouts (`ETIMEDOUT` on 5432; IPv6 `ENETUNREACH`) while loading the Payment module. This is separate from missing Razorpay checkout support.
+- Direct API reproduction for Mouse Pad returned HTTP 400: `Direct vendor checkout is not enabled until a payment routing provider is configured`. Its partner, Hash for Gamers Pvt LTD, was configured as vendor direct. With owner approval, the live partner was changed to Hash collects; retrying the same cart successfully added one Mouse Pad.
 - TestFlight Add to Cart has not been reproduced here. No app screenshot or real-user error is claimed. Request timestamp, endpoint, HTTP status/body, app version and request ID are needed to correlate an individual failure. Do not share auth tokens.
 
 ## Validation

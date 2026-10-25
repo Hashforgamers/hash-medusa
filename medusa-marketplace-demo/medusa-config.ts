@@ -16,6 +16,8 @@ module.exports = defineConfig({
   },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    // Avoid connection bursts and stale idle connections on the hosted database.
+    databaseDriverOptions: { pool: { min: 0, max: 5, idleTimeoutMillis: 10000 } },
     redisUrl: useRedis ? process.env.REDIS_URL : undefined,
     http: {
       storeCors: process.env.STORE_CORS!,

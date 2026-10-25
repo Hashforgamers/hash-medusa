@@ -15,12 +15,20 @@ if(process.env.HASH_ADMIN_EMAIL && (!process.env.HASH_ADMIN_PASSWORD || process.
 const cwd=path.resolve(__dirname,'../.medusa/server');
 const bin=path.resolve(__dirname,'../node_modules/.bin/medusa');
 let child;
-for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child?.kill(signal));
+let stopping = false;
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{stopping=true;child?.kill(signal)});
 function run(args){return new Promise((resolve,reject)=>{child=cp.spawn(bin,args,{cwd,env:process.env,stdio:'inherit'});child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error(`Medusa ${args[0]} exited with ${code}`)))});}
 (async()=>{
  if(process.env.HASH_RUN_MIGRATIONS!=='false'){
   await run(['db:migrate']);
   await run(['exec','./src/scripts/hash-setup.js']);
  }
- await run(['start']);
+ for(let attempt=1;attempt<=3;attempt++){
+  try{await run(['start']);break;}catch(error){
+   if(stopping || attempt===3)throw error;
+   console.warn(`Server start failed; retrying in ${attempt*5}s (${attempt}/3). Migrations will not be repeated.`);
+   await new Promise(resolve=>setTimeout(resolve,attempt*5000));
+   if(stopping)break;
+  }
+ }
 })().catch(e=>{console.error(e.message);process.exit(1)});
