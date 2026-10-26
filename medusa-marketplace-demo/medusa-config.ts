@@ -17,7 +17,10 @@ module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     // Avoid connection bursts and stale idle connections on the hosted database.
-    databaseDriverOptions: { pool: { min: 0, max: 5, idleTimeoutMillis: 10000 } },
+    databaseDriverOptions: {
+      connection: { ssl: /^(localhost|127\.0\.0\.1|\[::1\])$/.test(new URL(process.env.DATABASE_URL || 'postgres://localhost').hostname) ? false : { rejectUnauthorized: true } },
+      pool: { min: 0, max: 5, idleTimeoutMillis: 10000 },
+    },
     redisUrl: useRedis ? process.env.REDIS_URL : undefined,
     http: {
       storeCors: process.env.STORE_CORS!,
