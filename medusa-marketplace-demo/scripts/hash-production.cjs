@@ -12,6 +12,10 @@ for(const key of ['STORE_CORS','ADMIN_CORS','AUTH_CORS']){
  if(process.env[key].includes('*'))throw new Error(`${key} must use explicit allowed origins`);
 }
 if(process.env.HASH_ADMIN_EMAIL && (!process.env.HASH_ADMIN_PASSWORD || process.env.HASH_ADMIN_PASSWORD.length<12 || process.env.HASH_ADMIN_PASSWORD.includes('replace-with')))throw new Error('Provide a strong initial admin password');
+// Node's 250 ms address-attempt timeout is too short for cross-region DB connections.
+if(!process.env.NODE_OPTIONS?.includes('--network-family-autoselection-attempt-timeout')){
+ process.env.NODE_OPTIONS=[process.env.NODE_OPTIONS,'--network-family-autoselection-attempt-timeout=2000'].filter(Boolean).join(' ');
+}
 const cwd=path.resolve(__dirname,'../.medusa/server');
 const bin=path.resolve(__dirname,'../node_modules/.bin/medusa');
 let child;
