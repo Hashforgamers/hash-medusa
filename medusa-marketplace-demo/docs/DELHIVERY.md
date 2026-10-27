@@ -10,7 +10,9 @@ Hash Operations and vendors use **Shipping** in the partner portal. The connecto
 4. The vendor explicitly books the quoted shipment. The quote expires after 15 minutes and an address/item change requires a fresh quote. The booking transmits the customer's address/phone to Delhivery. It may incur a real carrier charge.
 5. Download the **Carrier PDF label** and schedule collection in Delhivery One. The earlier Hash A6 address sticker is still available but does not replace a carrier label with the required barcode. Pickup scheduling, pickup-address registration and shipment cancellation are currently performed in Delhivery One.
 
-## Actual charges: vendor pays, no markup
+## Delivery payer and actual charges, no markup
+
+The vendor owner chooses Customer pays or Seller pays in Shipping. The default is Seller pays. Customer-paid checkout uses saved packed-unit weight/dimensions and quantity to obtain a live Surface estimate; seller-paid checkout is ₹0. See [app integration guide](HFG-DELIVERY-CHECKOUT.md). The order retains its payer and collected delivery amount. Collected shipping is credited to vendor earnings without platform commission; the actual courier charge is then deducted. Any difference is a vendor adjustment, never an automatic extra customer charge.
 
 The quote API provides estimates, not final invoiced charges. Quotes are never posted as actual vendor fees. Once booked (including an uncertain booking), the order's remaining payouts are held pending final shipping-invoice reconciliation.
 
@@ -33,6 +35,7 @@ Authenticated vendor/super-admin routes: `GET /admin/hash/shipping`, `POST /admi
 POST actions:
 - `settings`: super admin; `token`, current `revision` (0 initially).
 - `enabled`: super admin; `active`, `revision`.
+- `payer`: vendor owner/super admin; `vendor_id`, `payer` (`seller` or `customer`), current `shipping_policy_revision` as `revision`.
 - `pickup`: super admin; `vendor_id`, registered pickup `name`, `pincode`.
 - `quote`: `order_id`, `parcel: {weight_g,length_cm,width_cm,height_cm,mode,invoice,ewaybill}`.
 - `book`: `order_id`, quote `revision`, `confirmed:true`.

@@ -75,6 +75,20 @@ export async function migrate() {
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS order_placed_at timestamptz;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS canceled_at timestamptz;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS shipping_fee_paise bigint NOT NULL DEFAULT 0 CHECK(shipping_fee_paise >= 0);
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS shipping_payer text NOT NULL DEFAULT 'seller' CHECK(shipping_payer IN ('seller','customer'));
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS shipping_policy_revision integer NOT NULL DEFAULT 1;
+  ALTER TABLE hash_listing ADD COLUMN IF NOT EXISTS shipping_package jsonb;
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS shipping_payer text NOT NULL DEFAULT 'seller';
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS customer_shipping_paise bigint NOT NULL DEFAULT 0;
+  CREATE TABLE IF NOT EXISTS hash_cart_shipping_quote (
+    cart_id text PRIMARY KEY, id text NOT NULL, vendor_id text NOT NULL, payer text NOT NULL,
+    fingerprint text NOT NULL, amount_paise bigint NOT NULL, policy_revision integer NOT NULL,
+    expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE IF NOT EXISTS hash_checkout_shipping_receipt (
+    id text PRIMARY KEY, cart_id text NOT NULL, fingerprint text NOT NULL, amount_paise bigint NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
   CREATE TABLE IF NOT EXISTS hash_shipping_config (
     id text PRIMARY KEY, secret_encrypted text NOT NULL, active boolean NOT NULL DEFAULT false,
     verified_at timestamptz, revision integer NOT NULL DEFAULT 1

@@ -8,6 +8,7 @@ import { applyShippingFee } from './shipping-fees'
 const id=z.string().min(1).max(200)
 export const parcelSchema=z.object({weight_g:z.number().int().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150),mode:z.enum(['Surface','Express']),invoice:z.string().trim().min(1).max(50),ewaybill:z.string().regex(/^\d{12}$/).or(z.literal('')).default('')})
 export const shippingCommands=z.discriminatedUnion('action',[
+ z.object({action:z.literal('payer'),vendor_id:id,payer:z.enum(['seller','customer']),revision:z.number().int().positive()}),
  z.object({action:z.literal('settings'),token:z.string().trim().min(16).max(1000),revision:z.number().int().nonnegative()}),
  z.object({action:z.literal('enabled'),active:z.boolean(),revision:z.number().int().positive()}),
  z.object({action:z.literal('pickup'),vendor_id:id,name:z.string().trim().min(1).max(100),pincode:z.string().regex(/^[1-9]\d{5}$/)}),
@@ -24,7 +25,7 @@ export async function delhiveryRequest(token:string,path:string,body?:any){
  if(!r.ok)throw Error(`Delhivery request failed (${r.status}); check account access or try again later`)
  const text=await r.text();if(text.length>2000000)throw Error('Carrier response too large');try{return JSON.parse(text)}catch{throw Error('Unexpected carrier response')}
 }
-async function config(){const {rows:[c]}=await db().query("SELECT * FROM hash_shipping_config WHERE id='delhivery'");if(!c?.active||!c.verified_at)fail('Enable a verified Delhivery connection in Shipping');return {...c,token:decryptCredential(c.secret_encrypted)}}
+export async function delhiveryConfig(){const {rows:[c]}=await db().query("SELECT * FROM hash_shipping_config WHERE id='delhivery'");if(!c?.active||!c.verified_at)fail('Enable a verified Delhivery connection in Shipping');return {...c,token:decryptCredential(c.secret_encrypted)}}
 export async function shippingOverview(a:any){
  const filter=a.superAdmin?null:a.vendor_id
  const [{rows:shipments},{rows:pickups},{rows:[settings]}]=await Promise.all([
@@ -38,6 +39,10 @@ function eligible(o:any){if(o.currency_code!=='inr'||o.delivery_kind!=='product'
 export function estimatePaise(body:any){const amount=Array.isArray(body)&&body.length===1?Number(body[0].total_amount):NaN;if(!Number.isFinite(amount)||amount<=0||amount>100000)throw Error('Delhivery did not return a valid shipping estimate');return Math.round(amount*100)}
 export function carrierStage(status:string,type:string){if(type==='DL'&&status==='Delivered')return 'carrier_delivered';if(type==='RT'||type==='RTO'||/RTO|Return/i.test(status))return 'return_in_progress';if(/Dispatched|Out for Delivery/i.test(status))return 'out_for_delivery';if(/In Transit|Pending|Picked Up/i.test(status))return 'shipped';return 'carrier_update'}
 export async function shippingAction(container:any,a:any,b:any){
+ if(b.action==='payer'){
+  own(a,b.vendor_id);if(!a.superAdmin&&a.role!=='owner')fail('Only the vendor owner can change who pays delivery');
+  return transaction(`shipping-policy:${b.vendor_id}`,async c=>{if(!(await c.query('UPDATE hash_vendor SET shipping_payer=$2,shipping_policy_revision=shipping_policy_revision+1 WHERE id=$1 AND shipping_policy_revision=$3',[b.vendor_id,b.payer,b.revision])).rowCount)fail('Shipping policy changed; refresh');await audit(c,a.id,'shipping_payer_changed',b.vendor_id,{payer:b.payer});return {ok:true}})
+ }
  if(b.action==='settings'){
   requireHash(a);const check=await delhiveryRequest(b.token,'/c/api/pin-codes/json/?filter_codes=110001');
   if(!Array.isArray(check.delivery_codes))fail('Delhivery token verification failed')
@@ -53,7 +58,7 @@ export async function shippingAction(container:any,a:any,b:any){
   requireHash(a);await reconcileOrder(container,b.order_id)
   return transaction(`order:${b.order_id}`,async c=>{const {rows:[s]}=await c.query('SELECT * FROM hash_shipment WHERE order_id=$1 FOR UPDATE',[b.order_id]);if(!s||s.status==='quoted'||s.status==='booking'||!s.waybill)fail('Resolve the shipment before recording its final invoice');if(s.revision!==b.revision)fail('Shipping record changed; refresh');if((await c.query("SELECT 1 FROM hash_settlement WHERE order_id=$1 AND status='processing'",[b.order_id])).rowCount)fail('Resolve processing transfers first');await c.query('UPDATE hash_shipment SET fee_paise=$2,fee_final=true,invoice_reference=$3,revision=revision+1 WHERE order_id=$1',[b.order_id,b.amount_paise,b.reference]);await c.query('UPDATE hash_order SET shipping_fee_paise=$2 WHERE order_id=$1',[b.order_id,b.amount_paise]);await applyShippingFee(c,b.order_id);await audit(c,a.id,'shipping_invoice_reconciled',b.order_id,{previous_paise:s.fee_paise,amount_paise:b.amount_paise,reference:b.reference,note:b.note});return {ok:true}})
  }
- const cfg=await config()
+ const cfg=await delhiveryConfig()
  if(b.action==='sync')return syncShipment(b.order_id,cfg.token,a.id)
  if(b.action==='label'){
   const {rows:[s]}=await db().query('SELECT waybill FROM hash_shipment WHERE order_id=$1',[b.order_id]);if(!s?.waybill)fail('Book a shipment first')

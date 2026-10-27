@@ -32,6 +32,10 @@ module.exports = defineConfig({
   },
   // Redis-backed infrastructure is enabled on the hosted deployment.
   modules: [
+    { resolve: "@medusajs/medusa/fulfillment", options: { providers: [
+      { resolve: "@medusajs/medusa/fulfillment-manual", id: "manual" },
+      { resolve: "./src/modules/hash-delivery", id: "hash_delivery" },
+    ] } },
     ...((process.env.RAZORPAY_CHECKOUT_MODE === 'live' || process.env.RAZORPAY_CHECKOUT_MODE === 'test' || (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)) ? [{ resolve: "@medusajs/medusa/payment", options: { providers: [{ resolve: "./src/modules/razorpay", id: "razorpay", options: process.env.RAZORPAY_CHECKOUT_MODE ? { mode: process.env.RAZORPAY_CHECKOUT_MODE } : { key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET } }] } }] : []),
     { resolve: "@medusajs/medusa/auth", options: { providers: [
       { resolve: "@medusajs/medusa/auth-emailpass", id: "emailpass" },

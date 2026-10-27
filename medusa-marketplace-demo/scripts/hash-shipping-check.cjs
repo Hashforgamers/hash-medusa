@@ -7,6 +7,7 @@ const {db,migrate}=require('../src/lib/hash/db');
 const {reconcileOrder,issueOtp,verifyOtp}=require('../src/lib/hash/settlements');
 const {encryptCredential}=require('../src/lib/hash/payout-connectors');
 const {shippingAction}=require('../src/lib/hash/delhivery');
+const {checkoutShippingQuote,validateCheckoutShipping}=require('../src/lib/hash/checkout-shipping');
 const {applyShippingFee,assertShippingPayable}=require('../src/lib/hash/shipping-fees');
 const {transaction}=require('../src/lib/hash/db');
 const {tracking,updateDelivery,shippingLabel}=require('../src/lib/hash/delivery');
@@ -26,6 +27,22 @@ const container={resolve:name=>({graph:async({filters})=>({data:filters.customer
   await db().query("INSERT INTO hash_shipping_config(id,secret_encrypted,active,verified_at) VALUES('delhivery',$1,true,now()) ON CONFLICT(id) DO UPDATE SET secret_encrypted=$1,active=true,verified_at=now()",[encryptCredential('local-test-token')]);
   await db().query('INSERT INTO hash_shipping_pickup(vendor_id,name,pincode) VALUES($1,$2,$3)',[vendor,'Local Test Pickup','560002']);
   global.fetch=async(url,opts)=>{let result;if(url.includes('pin-codes'))result={delivery_codes:[{postal_code:{pin:560001,pre_paid:'Y',remarks:''}}]};else if(url.includes('invoice/charges'))result=[{total_amount:25}];else if(url.includes('create.json')){manifests++;const body=JSON.parse(new URLSearchParams(opts.body).get('data'));assert.equal(body.pickup_location.name,'Local Test Pickup');assert.equal(body.shipments[0].payment_mode,'Prepaid');result={success:true,packages:[{status:'Success',waybill:'1234567890123'}]}}else if(url.includes('packages/json'))result={ShipmentData:[{Shipment:{ReferenceNo:key,AWB:'1234567890123',Status:{Status:'Delivered',StatusType:'DL',StatusDateTime:'2026-10-27T10:00:00'}}}]};else throw Error('Unexpected request');return {ok:true,text:async()=>JSON.stringify(result)}};
+  await db().query("UPDATE hash_vendor SET status='active',shipping_payer='customer' WHERE id=$1",[vendor]);
+  await db().query("UPDATE hash_listing SET shipping_package=$2 WHERE product_id=$1",[product,{weight_g:500,length_cm:20,width_cm:10,height_cm:5}]);
+  const checkout={...fixture,id:key+'_cart',shipping_methods:[]};
+  const cq=await checkoutShippingQuote(checkout);assert.equal(Number(cq.amount_paise),2500);
+  checkout.shipping_methods=[{amount:25,data:{hash_shipping_quote_id:cq.id}}];
+  await validateCheckoutShipping(checkout);
+  await db().query("UPDATE hash_cart_shipping_quote SET expires_at=now()-interval '1 minute' WHERE cart_id=$1",[checkout.id]);
+  const renewed=await checkoutShippingQuote(checkout);assert.notEqual(renewed.id,cq.id);
+  await validateCheckoutShipping(checkout); // Accepted quote survives refresh.
+  await assert.rejects(()=>validateCheckoutShipping({...checkout,shipping_address:{...checkout.shipping_address,postal_code:'560003'}}));
+  await assert.rejects(()=>validateCheckoutShipping({...checkout,shipping_methods:[{amount:0,data:{hash_shipping_quote_id:cq.id}}]}));
+  await db().query("UPDATE hash_vendor SET shipping_payer='seller',shipping_policy_revision=shipping_policy_revision+1 WHERE id=$1",[vendor]);
+  const free=await checkoutShippingQuote(checkout);assert.equal(Number(free.amount_paise),0);
+  await validateCheckoutShipping(checkout); // Policy changes affect new selections, not accepted amounts.
+  await db().query('DELETE FROM hash_cart_shipping_quote WHERE cart_id=$1',[checkout.id]);
+  await db().query('DELETE FROM hash_checkout_shipping_receipt WHERE cart_id=$1',[checkout.id]);
   const quote=await shippingAction(container,actor,{action:'quote',order_id:key,parcel:{weight_g:500,length_cm:20,width_cm:10,height_cm:5,mode:'Surface',invoice:'INV-local',ewaybill:''}});assert.equal(Number(quote.quote_paise),2500);
   await assert.rejects(()=>shippingAction(container,{...actor,vendor_id:'other'},{action:'book',order_id:key,revision:quote.revision,confirmed:true}));assert.equal(manifests,0);
   await shippingAction(container,actor,{action:'book',order_id:key,revision:quote.revision,confirmed:true});assert.equal(manifests,1);

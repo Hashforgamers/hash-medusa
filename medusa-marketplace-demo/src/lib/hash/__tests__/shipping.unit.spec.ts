@@ -9,3 +9,11 @@ describe('Delhivery safety and vendor charges',()=>{
  test('carrier delivery cannot complete the OTP milestone',()=>{expect(carrierStage('Delivered','DL')).toBe('carrier_delivered');expect(carrierStage('Delivered','RT')).toBe('return_in_progress');expect(carrierStage('Dispatched','UD')).toBe('out_for_delivery')})
  test('carrier requests never follow redirects and credentials stay in headers',async()=>{const old=global.fetch;global.fetch=jest.fn().mockResolvedValue({ok:true,text:async()=>'{"success":true}'}) as any;try{await delhiveryRequest('secret','/api/cmu/create.json',{shipments:[{name:'A & B'}]});const [url,opts]=(global.fetch as jest.Mock).mock.calls[0];expect(url).not.toContain('secret');expect(opts.redirect).toBe('error');expect(opts.headers.Authorization).toBe('Token secret');expect(new URLSearchParams(opts.body).get('data')).toContain('A & B')}finally{global.fetch=old}})
 })
+
+import { packedEstimate,cartFingerprint } from '../checkout-shipping'
+describe('customer delivery estimates',()=>{
+ const listings=[{product_id:'a',kind:'product',shipping_package:{weight_g:200,length_cm:20,width_cm:10,height_cm:3}}]
+ test('uses unit measurements and quantities without inventing a weight',()=>{expect(packedEstimate([{product_id:'a',quantity:2}],listings)).toEqual({weight_g:400,length_cm:20,width_cm:10,height_cm:6});expect(()=>packedEstimate([{product_id:'b',quantity:1}],listings)).toThrow()})
+ test('cart identity changes for address and quantity, but not payment details',()=>{const c={currency_code:'inr',items:[{product_id:'a',quantity:1}],shipping_address:{postal_code:'560001'}};expect(cartFingerprint(c)).not.toBe(cartFingerprint({...c,items:[{product_id:'a',quantity:2}]}));expect(cartFingerprint(c)).not.toBe(cartFingerprint({...c,shipping_address:{postal_code:'110001'}}));expect(cartFingerprint(c)).toBe(cartFingerprint({...c,payment_collection:{id:'p'}}))})
+ test('oversized or missing measurements block quoting',()=>{expect(()=>packedEstimate([{product_id:'a',quantity:1000}],listings)).toThrow();expect(()=>packedEstimate([{product_id:'a',quantity:1}],[{product_id:'a',kind:'product'}])).toThrow()})
+})

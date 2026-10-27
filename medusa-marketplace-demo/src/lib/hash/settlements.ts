@@ -5,7 +5,7 @@ import { db, transaction, audit } from "./db"
 import { minorUnits, split, newOtp, matchesOtp } from "./policy"
 import { fail, own } from "./access"
 
-const orderFields = ["id","customer_id","created_at","canceled_at","status","currency_code","total","items.*","items.tax_lines.*","items.adjustments.*","shipping_methods.*","shipping_methods.tax_lines.*","shipping_methods.adjustments.*","credit_lines.*", "payment_collections.payments.captures.*", "payment_collections.payments.refunds.*"]
+const orderFields = ["id","customer_id","created_at","canceled_at","status","currency_code","total","items.*","items.tax_lines.*","items.adjustments.*","shipping_methods.*","shipping_total","shipping_methods.tax_lines.*","shipping_methods.adjustments.*","credit_lines.*", "payment_collections.payments.captures.*", "payment_collections.payments.refunds.*"]
 export async function reconcileOrder(container: any, id: string) {
   return transaction(`order:${id}`, async c => {
     const { data } = await container.resolve("query").graph({ entity: "order", fields: orderFields, filters: { id } })
@@ -15,9 +15,12 @@ export async function reconcileOrder(container: any, id: string) {
     const { rows: listings } = await c.query(`SELECT l.*, v.commission_bps, v.payment_mode FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id WHERE product_id = ANY($1::text[])`, [ids])
     if (!listings.length) return // Legacy orders outside Hash remain untouched.
     if (listings.length !== ids.length || new Set(listings.map(l => l.vendor_id)).size !== 1) throw new Error(`Invalid marketplace order ${id}: expected one vendor`)
-    const total = minorUnits(order.total,order.currency_code), vendor = listings[0], amounts = split(total, vendor.commission_bps)
-    await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode,currency_code,settlement_plan)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode,order.currency_code,JSON.stringify(await selectedPlan(c,vendor.vendor_id))])
+    const total = minorUnits(order.total,order.currency_code), vendor = listings[0]
+    const shippingMethod=order.shipping_methods?.find((s:any)=>s.data?.hash_shipping_quote_id)
+    const shippingPaid=shippingMethod?Math.min(total,minorUnits(order.shipping_total||0,order.currency_code)):0
+    const amounts=split(total-shippingPaid,vendor.commission_bps);amounts.net+=shippingPaid
+    await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode,currency_code,settlement_plan,shipping_payer,customer_shipping_paise)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode,order.currency_code,JSON.stringify(await selectedPlan(c,vendor.vendor_id)),shippingMethod?.data?.hash_shipping_payer||'seller',shippingPaid])
     await c.query("UPDATE hash_order SET order_placed_at=COALESCE(order_placed_at,$2),delivery_kind=CASE WHEN order_placed_at IS NULL THEN $3 ELSE delivery_kind END,canceled_at=CASE WHEN $4 THEN COALESCE(canceled_at,$5,now()) ELSE canceled_at END WHERE order_id=$1",[id,order.created_at,listings.every(l=>l.kind==='service')?'service':'product',order.status==='canceled',order.canceled_at||null])
     const payments = (order.payment_collections || []).flatMap((p: any) => p.payments || [])
     const captures = payments.flatMap((p: any) => p.captures || [])
@@ -140,7 +143,7 @@ export async function reviewAdjustment(container: any,a: any,orderId: string,not
     const {rows:settlements}=await c.query("SELECT * FROM hash_settlement WHERE order_id=$1 FOR UPDATE",[orderId])
     if(settlements.some(s=>s.status==="processing"))fail("Resolve processing transfers before adjusting settlements")
     const gross=order.status==="canceled"?0:Math.max(0,Number(o.total_paise)-Number(o.refunded_paise))
-    const {net}=split(gross,o.commission_bps)
+    const shippingRetained=Math.min(gross,Number(o.customer_shipping_paise||0));const net=split(gross-shippingRetained,o.commission_bps).net+shippingRetained
     const paid=settlements.filter(s=>s.status==="paid").reduce((n,s)=>n+Number(s.amount_paise),0)
     let remaining=Math.max(0,net-paid)
     for(const milestone of ["payment","completion"]){

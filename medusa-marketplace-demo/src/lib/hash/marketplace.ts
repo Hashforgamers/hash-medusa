@@ -85,6 +85,7 @@ export async function saveProduct(container: any,a: any,b: any) {
       productId = result[0].id
       await c.query("INSERT INTO hash_listing(product_id,vendor_id,kind) VALUES($1,$2,$3)",[productId,b.vendor_id,b.kind])
     }
+    if(b.shipping_package!==undefined)await c.query('UPDATE hash_listing SET shipping_package=$2 WHERE product_id=$1',[productId,b.kind==='product'?JSON.stringify(b.shipping_package):null])
     await setStock(container,productId,b.stock)
     await c.query("UPDATE hash_listing SET kind=$2 WHERE product_id=$1",[productId,b.kind])
     await audit(c,a.id,"listing_submitted",productId,{vendor_id:b.vendor_id})
