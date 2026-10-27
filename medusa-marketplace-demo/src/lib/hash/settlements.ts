@@ -1,3 +1,4 @@
+import { applyShippingFee, assertShippingPayable } from './shipping-fees'
 import { selectedPlan, allocation, dueDate } from "./settlement-plans"
 import { getPayoutAdapter } from "./payouts"
 import { db, transaction, audit } from "./db"
@@ -34,6 +35,7 @@ export async function reconcileOrder(container: any, id: string) {
       await schedule(c, saved, "payment", allocation(Number(saved.net_paise),saved.settlement_plan).payment, paidAt)
       if (saved.completed_at) await schedule(c,saved,"completion",Number(saved.net_paise)-allocation(Number(saved.net_paise),saved.settlement_plan).payment,saved.completed_at)
     }
+    await applyShippingFee(c,id)
   })
 }
 async function schedule(c: any, order: any, milestone: string, amount: number, at: Date) {
@@ -94,6 +96,7 @@ export async function verifyOtp(container: any, a: any, orderId: string, code: s
     const completed = new Date()
     await c.query("UPDATE hash_order SET completed_at=$2,otp_hash=NULL,otp_nonce=NULL WHERE order_id=$1",[orderId,completed])
     if (o.payment_mode === "hash_collects") await schedule(c,o,"completion",Number(o.net_paise)-allocation(Number(o.net_paise),o.settlement_plan).payment,completed)
+    await applyShippingFee(c,orderId)
     await audit(c,a.id,"completion_verified",orderId)
     return { completed_at: completed }
   })
@@ -107,6 +110,7 @@ export async function recordPayout(container: any, a: any, id: string, reference
   await reconcileOrder(container,row.order_id)
   return transaction(`order:${row.order_id}`,async c => {
     const { rows: [s] } = await c.query(`SELECT s.*, o.hold_reason,o.currency_code,v.bank_details,v.bank_verified_at,v.status AS vendor_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE s.id=$1 FOR UPDATE OF s,v`,[id])
+    await assertShippingPayable(c,row.order_id)
     if(s.provider!=="manual" && s.status!=="failed")fail("Use the provider transfer review for this settlement")
     if (s.status === "paid") {
       if (s.reference === reference.trim()) return {id:s.id,status:s.status,reference:s.reference,paid_at:s.paid_at}
@@ -147,6 +151,7 @@ export async function reviewAdjustment(container: any,a: any,orderId: string,not
       remaining-=amount
     }
     await c.query("UPDATE hash_order SET net_paise=$2,reviewed_refund_paise=refunded_paise,reviewed_canceled=$3,recovery_paise=$4,reviewed_total_paise=$5,hold_reason=NULL WHERE order_id=$1",[orderId,net,order.status==="canceled",Math.max(0,paid-net),minorUnits(order.total,order.currency_code)])
+    await applyShippingFee(c,orderId)
     await audit(c,a.id,"refund_settlement_adjusted",orderId,{note,net_paise:net,recovery_paise:Math.max(0,paid-net)})
     return {net_paise:net,recovery_paise:Math.max(0,paid-net)}
   })

@@ -74,6 +74,23 @@ export async function migrate() {
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS delivery_details jsonb NOT NULL DEFAULT '{}';
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS order_placed_at timestamptz;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS canceled_at timestamptz;
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS shipping_fee_paise bigint NOT NULL DEFAULT 0 CHECK(shipping_fee_paise >= 0);
+  CREATE TABLE IF NOT EXISTS hash_shipping_config (
+    id text PRIMARY KEY, secret_encrypted text NOT NULL, active boolean NOT NULL DEFAULT false,
+    verified_at timestamptz, revision integer NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS hash_shipping_pickup (
+    vendor_id text PRIMARY KEY REFERENCES hash_vendor(id), name text NOT NULL, pincode text NOT NULL,
+    revision integer NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS hash_shipment (
+    order_id text PRIMARY KEY REFERENCES hash_order(order_id), vendor_id text NOT NULL REFERENCES hash_vendor(id),
+    status text NOT NULL DEFAULT 'quoted', waybill text UNIQUE, parcel jsonb NOT NULL,
+    pickup jsonb NOT NULL, quote_paise bigint NOT NULL, quoted_at timestamptz NOT NULL DEFAULT now(),
+    fee_paise bigint NOT NULL DEFAULT 0 CHECK(fee_paise >= 0), fee_final boolean NOT NULL DEFAULT false,
+    invoice_reference text, revision integer NOT NULL DEFAULT 1, carrier_status text,
+    carrier_at timestamptz, synced_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
+  );
   CREATE TABLE IF NOT EXISTS hash_delivery_event (
     id bigserial PRIMARY KEY,order_id text NOT NULL REFERENCES hash_order(order_id),status text NOT NULL,
     note text NOT NULL DEFAULT '',details jsonb NOT NULL DEFAULT '{}',created_at timestamptz NOT NULL DEFAULT now()

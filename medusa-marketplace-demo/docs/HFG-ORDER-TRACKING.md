@@ -1,6 +1,6 @@
 # HFG app: manual order tracking and shipping labels
 
-The partner or Hash Operations updates tracking manually. No courier account, courier webhook, live GPS, SMS, push notification or automatic courier status import is configured. App engineers should poll the customer's order while the tracking screen is open, and show new timeline entries as in-app updates. A carrier-reported delivery does not replace customer OTP confirmation.
+The partner or Hash Operations updates non-integrated shipments manually. Delhivery orders now support periodic carrier status import (see below). No courier webhook, live GPS, SMS or push notification is configured. App engineers should poll the customer's order while the tracking screen is open, and show new timeline entries as in-app updates. A carrier-reported delivery does not replace customer OTP confirmation.
 
 ## Customer API
 
@@ -50,4 +50,8 @@ Orders → Details provides **Print / save PDF label** and **Download label (HTM
 
 `POST /admin/hash` with `{ "action":"shipping_label", "order_id":"order_..." }` returns `{ "result": { "html":"...", "filename":"hash-label-123.html" } }`. It is authenticated, vendor scoped, audited, non-cacheable, and requires any temporary password to have been changed. Never publish this endpoint or generated files: labels contain recipient personal information. It contains no customer OTP, bank details or settlement amounts.
 
-This is an address sticker, **not a purchased courier shipping label**. The vendor must arrange postage and use any label the courier requires. An automatic courier integration can be added later.
+This is an address sticker, **not a purchased courier shipping label**. The vendor must arrange postage and use any label the courier requires. For Delhivery orders, use the carrier PDF label from Shipping.
+
+## Delhivery integration
+
+Orders booked through Hash Shipping now import Delhivery tracking approximately every 15 minutes. Manual tracking remains for other couriers; managed Delhivery orders use carrier refresh. Render `carrier_delivered` as "Courier reports delivered — awaiting OTP", `return_in_progress` as a return update, and `carrier_update` as a carrier update. These are timeline events; only successful customer OTP changes the final Hash status to delivered. See [Delhivery operations and fee guide](DELHIVERY.md). No courier API token or vendor shipping-charge controls belong in the customer app.

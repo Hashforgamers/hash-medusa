@@ -41,6 +41,7 @@ export async function updateDelivery(container:any,a:any,b:z.infer<typeof delive
  return transaction(`order:${b.order_id}`,async c=>{
   const {rows:[o]}=await c.query('SELECT * FROM hash_order WHERE order_id=$1 FOR UPDATE',[b.order_id]);own(a,o.vendor_id)
   if(o.delivery_revision!==b.revision)fail('Tracking changed; refresh the order before saving')
+  if((await c.query("SELECT 1 FROM hash_shipment WHERE order_id=$1 AND status<>'quoted'",[b.order_id])).rowCount)fail('Use Delhivery tracking refresh for this shipment')
   validateDeliveryTransition(o,b.status)
   const details={courier:b.courier,tracking_number:b.tracking_number,tracking_url:b.tracking_url,expected_delivery:b.expected_delivery}
   if(o.delivery_status===b.status&&JSON.stringify(o.delivery_details)===JSON.stringify(details)&&!b.note)return {ok:true,revision:o.delivery_revision}
