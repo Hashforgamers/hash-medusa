@@ -1,3 +1,4 @@
+import { deliveryCommand, updateDelivery, tracking, shippingLabel } from '../../../lib/hash/delivery'
 import { readPlans, selectedPlan, planSummary } from "../../../lib/hash/settlement-plans"
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
@@ -5,10 +6,12 @@ import { z } from "zod"
 import { actor, requireHash, own, fail } from "../../../lib/hash/access"
 import { db, audit, transaction } from "../../../lib/hash/db"
 import { onboard, addMember, saveProduct, reviewProduct, catalog, setStock } from "../../../lib/hash/marketplace"
-import { reconcileAll, recordPayout, verifyOtp, reviewAdjustment } from "../../../lib/hash/settlements"
+import { reconcileOrder, reconcileAll, recordPayout, verifyOtp, reviewAdjustment } from "../../../lib/hash/settlements"
 import { bankSchema, businessSchema, storedBank, publicVendor } from "../../../lib/hash/vendor-profile"
 const id = z.string().min(1).max(200)
 const commands = z.discriminatedUnion("action",[
+ deliveryCommand,
+ z.object({action:z.literal("shipping_label"),order_id:id}),
  z.object({action:z.literal("onboard"),name:z.string().min(2).max(150),email:z.string().email().transform(s=>s.toLowerCase()),commission_bps:z.number().int().min(0).max(10000).default(0),payment_mode:z.enum(["hash_collects","vendor_direct"]).default("hash_collects"),payout_details:z.string().max(2000).default(""),business_details:businessSchema.optional(),bank_details:bankSchema.optional(),settlement_plan_id:id.nullable().optional()}),
  z.object({action:z.literal("add_member"),vendor_id:id,email:z.string().email().transform(s=>s.toLowerCase())}),
  z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01).optional(),prices:z.array(z.object({currency_code:z.string().regex(/^[a-z]{3}$/),amount:z.number().positive().max(10000000)})).min(1).max(30).optional(),stock:z.number().int().min(0).max(10000000)}),
@@ -28,13 +31,15 @@ export async function GET(req: MedusaRequest,res: MedusaResponse) {
  if (typeof req.query.order_id === "string") {
   const {rows:[o]}=await db().query("SELECT vendor_id FROM hash_order WHERE order_id=$1",[req.query.order_id])
   if(!o)fail("Order not found");own(a,o.vendor_id)
+  await reconcileOrder(req.scope,req.query.order_id)
   const {data:[order]}=await req.scope.resolve("query").graph({entity:"order",fields:["id","display_id","email","currency_code","created_at","items.title","items.quantity","items.unit_price","shipping_address.*"],filters:{id:req.query.order_id}})
-  return res.json({order})
+  res.setHeader("Cache-Control","no-store")
+  return res.json({order,tracking:await tracking(req.query.order_id)})
  }
  const filter = a.superAdmin ? null : a.vendor_id
  const [{rows:vendors},{rows:orders},{rows:settlements},{rows:members}] = await Promise.all([
   db().query("SELECT * FROM hash_vendor WHERE ($1::text IS NULL OR id=$1) ORDER BY created_at DESC",[filter]),
-  db().query(`SELECT order_id,vendor_id,currency_code,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,settlement_plan,paid_at,completed_at,hold_reason,created_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
+  db().query(`SELECT order_id,vendor_id,currency_code,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,settlement_plan,paid_at,completed_at,hold_reason,created_at,delivery_status,delivery_kind,delivery_revision,canceled_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
   db().query(`SELECT s.*,o.currency_code,o.hold_reason,CASE WHEN NOT (v.bank_details ? 'account_number') THEN 'Bank account required' WHEN v.bank_verified_at IS NULL THEN 'Bank verification required' WHEN v.bank_details->>'currency_code' <> o.currency_code THEN 'Bank currency does not match settlement' ELSE NULL END AS payout_block_reason,CASE WHEN s.status='scheduled' AND s.due_at<=now() THEN 'due' ELSE s.status END AS display_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE ($1::text IS NULL OR s.vendor_id=$1) ORDER BY s.due_at DESC LIMIT 1000`,[filter]),
   db().query(`SELECT m.*,u.email FROM hash_member m JOIN "user" u ON u.id=m.user_id WHERE ($1::text IS NULL OR vendor_id=$1) AND u.deleted_at IS NULL`,[filter])
  ])
@@ -54,6 +59,16 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
  if (user.metadata?.hash_password_change_required && b.action!=="change_password") fail("Change your temporary password before continuing")
  let result: any
  switch(b.action) {
+ case "update_delivery": result=await updateDelivery(req.scope,a,b);break
+ case "shipping_label": {
+  let {rows:[o]}=await db().query('SELECT * FROM hash_order WHERE order_id=$1',[b.order_id]);if(!o)fail('Order not found');own(a,o.vendor_id)
+  await reconcileOrder(req.scope,b.order_id);o=(await db().query('SELECT * FROM hash_order WHERE order_id=$1',[b.order_id])).rows[0]
+  const {data:[order]}:any=await req.scope.resolve('query').graph({entity:'order',fields:['id','display_id','items.quantity','shipping_address.*'],filters:{id:b.order_id}})
+  if(!order)fail('Order not found');if(o.delivery_kind==='service')fail('Shipping labels are for physical products')
+  const {rows:[vendor]}=await db().query('SELECT name,business_details FROM hash_vendor WHERE id=$1',[o.vendor_id])
+  result={html:shippingLabel({...order,paid:!!o.paid_at&&!o.hold_reason&&!o.canceled_at},vendor,o.delivery_details),filename:`hash-label-${order.display_id||order.id}.html`}
+  await audit(db(),a.id,'shipping_label_generated',b.order_id);res.setHeader('Cache-Control','no-store');break
+ }
  case "onboard": result=await onboard(req.scope,a,b); break
  case "add_member": result=await addMember(req.scope,a,b); break
  case "save_product": if(!b.prices&&!b.price_inr)fail("Provide listing prices");result=await saveProduct(req.scope,a,b); break

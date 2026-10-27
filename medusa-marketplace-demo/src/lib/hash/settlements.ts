@@ -4,7 +4,7 @@ import { db, transaction, audit } from "./db"
 import { minorUnits, split, newOtp, matchesOtp } from "./policy"
 import { fail, own } from "./access"
 
-const orderFields = ["id","customer_id","status","currency_code","total","items.*","items.tax_lines.*","items.adjustments.*","shipping_methods.*","shipping_methods.tax_lines.*","shipping_methods.adjustments.*","credit_lines.*", "payment_collections.payments.captures.*", "payment_collections.payments.refunds.*"]
+const orderFields = ["id","customer_id","created_at","canceled_at","status","currency_code","total","items.*","items.tax_lines.*","items.adjustments.*","shipping_methods.*","shipping_methods.tax_lines.*","shipping_methods.adjustments.*","credit_lines.*", "payment_collections.payments.captures.*", "payment_collections.payments.refunds.*"]
 export async function reconcileOrder(container: any, id: string) {
   return transaction(`order:${id}`, async c => {
     const { data } = await container.resolve("query").graph({ entity: "order", fields: orderFields, filters: { id } })
@@ -17,6 +17,7 @@ export async function reconcileOrder(container: any, id: string) {
     const total = minorUnits(order.total,order.currency_code), vendor = listings[0], amounts = split(total, vendor.commission_bps)
     await c.query(`INSERT INTO hash_order(order_id,vendor_id,customer_id,total_paise,net_paise,commission_bps,payment_mode,currency_code,settlement_plan)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(order_id) DO NOTHING`, [id,vendor.vendor_id,order.customer_id,total,amounts.net,vendor.commission_bps,vendor.payment_mode,order.currency_code,JSON.stringify(await selectedPlan(c,vendor.vendor_id))])
+    await c.query("UPDATE hash_order SET order_placed_at=COALESCE(order_placed_at,$2),delivery_kind=CASE WHEN order_placed_at IS NULL THEN $3 ELSE delivery_kind END,canceled_at=CASE WHEN $4 THEN COALESCE(canceled_at,$5,now()) ELSE canceled_at END WHERE order_id=$1",[id,order.created_at,listings.every(l=>l.kind==='service')?'service':'product',order.status==='canceled',order.canceled_at||null])
     const payments = (order.payment_collections || []).flatMap((p: any) => p.payments || [])
     const captures = payments.flatMap((p: any) => p.captures || [])
     const captured = captures.reduce((s: number, p: any) => s + minorUnits(p.amount,order.currency_code),0)

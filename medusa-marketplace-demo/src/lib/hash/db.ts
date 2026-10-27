@@ -68,6 +68,17 @@ export async function migrate() {
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS reviewed_canceled boolean NOT NULL DEFAULT false;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS recovery_paise bigint NOT NULL DEFAULT 0;
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS settlement_plan jsonb NOT NULL DEFAULT '{"id":"legacy","revision":1,"name":"Legacy 50/50","capture_bps":5000,"capture_delay":1,"completion_delay":1,"day_type":"business","timezone":"Asia/Kolkata","weekend":[0,6],"holidays":[]}';
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS delivery_status text NOT NULL DEFAULT 'placed';
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS delivery_kind text NOT NULL DEFAULT 'product';
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS delivery_revision integer NOT NULL DEFAULT 0;
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS delivery_details jsonb NOT NULL DEFAULT '{}';
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS order_placed_at timestamptz;
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS canceled_at timestamptz;
+  CREATE TABLE IF NOT EXISTS hash_delivery_event (
+    id bigserial PRIMARY KEY,order_id text NOT NULL REFERENCES hash_order(order_id),status text NOT NULL,
+    note text NOT NULL DEFAULT '',details jsonb NOT NULL DEFAULT '{}',created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS hash_delivery_event_order ON hash_delivery_event(order_id,id);
   CREATE TABLE IF NOT EXISTS hash_settlement (
     id text PRIMARY KEY, order_id text NOT NULL REFERENCES hash_order(order_id),
     vendor_id text NOT NULL REFERENCES hash_vendor(id), milestone text NOT NULL CHECK(milestone IN ('payment','completion')),
