@@ -7,6 +7,7 @@ const {db,migrate}=require('../src/lib/hash/db');
 const {reconcileOrder,issueOtp,verifyOtp}=require('../src/lib/hash/settlements');
 const {encryptCredential}=require('../src/lib/hash/payout-connectors');
 const {shippingAction}=require('../src/lib/hash/delhivery');
+const {prepareDispatch,dispatchOrder,resolveDispatch}=require('../src/lib/hash/dispatch');
 const {checkoutShippingQuote,validateCheckoutShipping}=require('../src/lib/hash/checkout-shipping');
 const {applyShippingFee,assertShippingPayable}=require('../src/lib/hash/shipping-fees');
 const {transaction}=require('../src/lib/hash/db');
@@ -22,11 +23,11 @@ const container={resolve:name=>({graph:async({filters})=>({data:filters.customer
  const actor={id:'local-test',vendor_id:vendor};
  // Isolated adapter test uses only fake HTTP responses; no real customer data leaves this machine.
  const {rows:priorConfig}=await db().query("SELECT * FROM hash_shipping_config WHERE id='delhivery'");
- const realFetch=global.fetch;let manifests=0;
+ const realFetch=global.fetch;let manifests=0,pickupRequests=0,warehouses=0;
  try{
   await db().query("INSERT INTO hash_shipping_config(id,secret_encrypted,active,verified_at) VALUES('delhivery',$1,true,now()) ON CONFLICT(id) DO UPDATE SET secret_encrypted=$1,active=true,verified_at=now()",[encryptCredential('local-test-token')]);
   await db().query('INSERT INTO hash_shipping_pickup(vendor_id,name,pincode) VALUES($1,$2,$3)',[vendor,'Local Test Pickup','560002']);
-  global.fetch=async(url,opts)=>{let result;if(url.includes('pin-codes'))result={delivery_codes:[{postal_code:{pin:560001,pre_paid:'Y',remarks:''}}]};else if(url.includes('invoice/charges'))result=[{total_amount:25}];else if(url.includes('create.json')){manifests++;const body=JSON.parse(new URLSearchParams(opts.body).get('data'));assert.equal(body.pickup_location.name,'Local Test Pickup');assert.equal(body.shipments[0].payment_mode,'Prepaid');result={success:true,packages:[{status:'Success',waybill:'1234567890123'}]}}else if(url.includes('packages/json'))result={ShipmentData:[{Shipment:{ReferenceNo:key,AWB:'1234567890123',Status:{Status:'Delivered',StatusType:'DL',StatusDateTime:'2026-10-27T10:00:00'}}}]};else throw Error('Unexpected request');return {ok:true,text:async()=>JSON.stringify(result)}};
+  global.fetch=async(url,opts)=>{let result;if(url.includes('pin-codes'))result={delivery_codes:[{postal_code:{pin:560001,pre_paid:'Y',remarks:''}}]};else if(url.includes('invoice/charges'))result=[{total_amount:25}];else if(url.includes('clientwarehouse/create')){warehouses++;const p=JSON.parse(opts.body);assert.equal(p.pin,'560002');result={success:true}}else if(url.includes('/fm/request/new/')){pickupRequests++;const p=JSON.parse(opts.body);assert.equal(opts.headers['Content-Type'],'application/json');assert.equal(p.pickup_time,'14:00:00');result={pickup_id:12345}}else if(url.includes('create.json')){manifests++;const body=JSON.parse(new URLSearchParams(opts.body).get('data'));assert(body.pickup_location.name.startsWith('HASH-'));assert(body.shipments[0].add.includes('Edited delivery address'));assert.equal(body.shipments[0].payment_mode,'Prepaid');result={success:true,packages:[{status:'Success',waybill:'1234567890123'}]}}else if(url.includes('packages/json'))result={ShipmentData:[{Shipment:{ReferenceNo:key,AWB:'1234567890123',Status:{Status:'Delivered',StatusType:'DL',StatusDateTime:'2026-10-27T10:00:00'}}}]};else throw Error('Unexpected request');return {ok:true,text:async()=>JSON.stringify(result)}};
   await db().query("UPDATE hash_vendor SET status='active',shipping_payer='customer' WHERE id=$1",[vendor]);
   await db().query("UPDATE hash_listing SET shipping_package=$2 WHERE product_id=$1",[product,{weight_g:500,length_cm:20,width_cm:10,height_cm:5}]);
   const checkout={...fixture,id:key+'_cart',shipping_methods:[]};
@@ -46,11 +47,26 @@ const container={resolve:name=>({graph:async({filters})=>({data:filters.customer
   const quote=await shippingAction(container,actor,{action:'quote',order_id:key,parcel:{weight_g:500,length_cm:20,width_cm:10,height_cm:5,mode:'Surface',invoice:'INV-local',ewaybill:''}});assert.equal(Number(quote.quote_paise),2500);
   await assert.rejects(()=>shippingAction(container,{...actor,vendor_id:'other'},{action:'book',order_id:key,revision:quote.revision,confirmed:true}));assert.equal(manifests,0);
   await db().query("UPDATE hash_order SET delivery_status='ready_to_ship' WHERE order_id=$1",[key]);
-  await shippingAction(container,actor,{action:'book',order_id:key,revision:quote.revision,confirmed:true});assert.equal(manifests,1);
+  const address={first_name:'Sample',last_name:'Customer',address_1:'Edited delivery address',address_2:'',city:'Bengaluru',province:'Karnataka',postal_code:'560001',country_code:'in',phone:'9000000000'};
+  const prepared=await prepareDispatch(container,actor,key,{delivery_address:address,pickup_address:{...address,address_1:'Edited pickup address',postal_code:'560002'}});
+  const command={order_id:key,revision:prepared.shipment.revision,pickup_date:new Date(Date.now()+86400000).toISOString().slice(0,10),confirmed:true};
+  await assert.rejects(()=>dispatchOrder(container,{...actor,vendor_id:'other'},command));
+  await dispatchOrder(container,actor,command);assert.equal(manifests,1);assert.equal(warehouses,1);assert.equal(pickupRequests,1);
+  const pickupRecord=(await db().query('SELECT pickup_request_id AS id FROM hash_shipment WHERE order_id=$1',[key])).rows[0];
+  await db().query("UPDATE hash_pickup_request SET status='review',created_at=now()-interval '3 minutes' WHERE id=$1",[pickupRecord.id]);
+  assert.equal((await dispatchOrder(container,actor,command)).status,'pickup_review');assert.equal(pickupRequests,1);
+  const resolution={kind:'pickup',id:String(pickupRecord.id),outcome:'confirmed',carrier_id:'12345',note:'Verified in synthetic carrier dashboard',confirmed:true};
+  await assert.rejects(()=>resolveDispatch(actor,resolution));
+  await resolveDispatch({...actor,superAdmin:true},resolution);
+  await Promise.all([dispatchOrder(container,actor,command),dispatchOrder(container,actor,command)]);assert.equal(pickupRequests,1);
+
+  await dispatchOrder(container,actor,command);assert.equal(manifests,1);assert.equal(pickupRequests,1);
+  const finalTracking=await tracking(key,customer);assert.equal(finalTracking.delivery_address.address_1,'Edited delivery address');
+
   await assert.rejects(()=>shippingAction(container,actor,{action:'book',order_id:key,revision:quote.revision,confirmed:true}));assert.equal(manifests,1);
   await shippingAction(container,actor,{action:'sync',order_id:key});const tracked=await tracking(key,customer);assert(tracked.timeline.some(e=>e.status==='carrier_delivered'));assert.notEqual(tracked.status,'delivered');
   await assert.rejects(()=>assertShippingPayable(db(),key));
- }finally{global.fetch=realFetch;await db().query("DELETE FROM hash_shipping_config WHERE id='delhivery'");if(priorConfig.length){const v=priorConfig[0];await db().query('INSERT INTO hash_shipping_config(id,secret_encrypted,active,verified_at,revision) VALUES($1,$2,$3,$4,$5)',[v.id,v.secret_encrypted,v.active,v.verified_at,v.revision])}await db().query('DELETE FROM hash_shipping_pickup WHERE vendor_id=$1',[vendor]);await db().query('DELETE FROM hash_shipment WHERE order_id=$1',[key]);await db().query('DELETE FROM hash_delivery_event WHERE order_id=$1',[key]);await db().query("UPDATE hash_order SET delivery_status='placed',delivery_revision=0,delivery_details='{}' WHERE order_id=$1",[key])}
+ }finally{global.fetch=realFetch;await db().query("DELETE FROM hash_shipping_config WHERE id='delhivery'");if(priorConfig.length){const v=priorConfig[0];await db().query('INSERT INTO hash_shipping_config(id,secret_encrypted,active,verified_at,revision) VALUES($1,$2,$3,$4,$5)',[v.id,v.secret_encrypted,v.active,v.verified_at,v.revision])}await db().query('DELETE FROM hash_shipping_pickup WHERE vendor_id=$1',[vendor]);await db().query('DELETE FROM hash_shipment WHERE order_id=$1',[key]);await db().query('DELETE FROM hash_pickup_request WHERE location_name IN (SELECT name FROM hash_dispatch_location WHERE vendor_id=$1)',[vendor]);await db().query('DELETE FROM hash_dispatch_location WHERE vendor_id=$1',[vendor]);await db().query('DELETE FROM hash_delivery_event WHERE order_id=$1',[key]);await db().query("UPDATE hash_order SET delivery_status='placed',delivery_revision=0,delivery_details='{}' WHERE order_id=$1",[key])}
 
  let t=await tracking(key,customer);assert.equal(t.status,'placed');assert.equal(t.paid,true);
  await assert.rejects(()=>tracking(key,'another-customer'));

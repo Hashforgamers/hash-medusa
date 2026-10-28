@@ -39,7 +39,7 @@ export async function GET(req: MedusaRequest,res: MedusaResponse) {
  const filter = a.superAdmin ? null : a.vendor_id
  const [{rows:vendors},{rows:orders},{rows:settlements},{rows:members}] = await Promise.all([
   db().query("SELECT * FROM hash_vendor WHERE ($1::text IS NULL OR id=$1) ORDER BY created_at DESC",[filter]),
-  db().query(`SELECT order_id,vendor_id,currency_code,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,settlement_plan,paid_at,completed_at,hold_reason,created_at,shipping_payer,customer_shipping_paise,shipping_fee_paise,delivery_status,delivery_kind,delivery_revision,canceled_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
+  db().query(`SELECT order_id,vendor_id,currency_code,total_paise,net_paise,recovery_paise,captured_paise,refunded_paise,payment_mode,settlement_plan,paid_at,completed_at,hold_reason,created_at,shipping_payer,customer_shipping_paise,shipping_fee_paise,delivery_status,delivery_kind,delivery_revision,delivery_details,canceled_at FROM hash_order WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500`,[filter]),
   db().query(`SELECT s.*,o.currency_code,o.hold_reason,CASE WHEN EXISTS(SELECT 1 FROM hash_shipment hs WHERE hs.order_id=o.order_id AND hs.status<>'quoted' AND NOT hs.fee_final) THEN 'Final shipping invoice required' WHEN NOT (v.bank_details ? 'account_number') THEN 'Bank account required' WHEN v.bank_verified_at IS NULL THEN 'Bank verification required' WHEN v.bank_details->>'currency_code' <> o.currency_code THEN 'Bank currency does not match settlement' ELSE NULL END AS payout_block_reason,CASE WHEN s.status='scheduled' AND s.due_at<=now() THEN 'due' ELSE s.status END AS display_status FROM hash_settlement s JOIN hash_order o ON o.order_id=s.order_id JOIN hash_vendor v ON v.id=s.vendor_id WHERE ($1::text IS NULL OR s.vendor_id=$1) ORDER BY s.due_at DESC LIMIT 1000`,[filter]),
   db().query(`SELECT m.*,u.email FROM hash_member m JOIN "user" u ON u.id=m.user_id WHERE ($1::text IS NULL OR vendor_id=$1) AND u.deleted_at IS NULL`,[filter])
  ])
@@ -66,6 +66,8 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
   const {data:[order]}:any=await req.scope.resolve('query').graph({entity:'order',fields:['id','display_id','items.quantity','shipping_address.*'],filters:{id:b.order_id}})
   if(!order)fail('Order not found');if(o.delivery_kind==='service')fail('Shipping labels are for physical products')
   const {rows:[vendor]}=await db().query('SELECT name,business_details FROM hash_vendor WHERE id=$1',[o.vendor_id])
+  const {rows:[shipment]}=await db().query('SELECT parcel,pickup FROM hash_shipment WHERE order_id=$1',[b.order_id]);if(shipment?.parcel?.delivery_address)order.shipping_address=shipment.parcel.delivery_address
+  if(shipment?.pickup?.address){const p=shipment.pickup.address;vendor.business_details={...vendor.business_details,address_line1:p.address_1,address_line2:p.address_2,city:p.city,state:p.province,postal_code:p.postal_code,phone:p.phone}}
   result={html:shippingLabel({...order,paid:!!o.paid_at&&!o.hold_reason&&!o.canceled_at},vendor,o.delivery_details),filename:`hash-label-${order.display_id||order.id}.html`}
   await audit(db(),a.id,'shipping_label_generated',b.order_id);res.setHeader('Cache-Control','no-store');break
  }

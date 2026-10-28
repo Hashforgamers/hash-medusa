@@ -27,7 +27,7 @@ describe('manual customer tracking',()=>{
   expect(deliveryCommand.safeParse({...input,expected_delivery:'2026-02-30'}).success).toBe(false)
  })
  test('customer lookup is ownership scoped and does not return private ledger data',async()=>{
-  const query=jest.fn().mockResolvedValueOnce({rows:[{...order,otp_hash:'secret',net_paise:123,completed_at:new Date(),canceled_at:new Date()}]}).mockResolvedValueOnce({rows:[]});(db as jest.Mock).mockReturnValue({query})
+  const query=jest.fn().mockResolvedValueOnce({rows:[{...order,otp_hash:'secret',net_paise:123,completed_at:new Date(),canceled_at:new Date()}]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]});(db as jest.Mock).mockReturnValue({query})
   const value=await tracking('order_1','customer_1')
   expect(query.mock.calls[0][1]).toEqual(['order_1','customer_1']);expect(value.status).toBe('canceled');expect(value.completion_eligible).toBe(false);expect(JSON.stringify(value)).not.toMatch(/secret|net_paise|otp_hash/)
  })

@@ -27,13 +27,14 @@ export async function tracking(orderId:string,customerId?:string){
  const {rows:[o]}=await db().query('SELECT * FROM hash_order WHERE order_id=$1 AND ($2::text IS NULL OR customer_id=$2)',[orderId,customerId??null])
  if(!o)fail('Order not found','not_found' as any)
  const {rows:events}=await db().query('SELECT id,status,note,details,created_at FROM hash_delivery_event WHERE order_id=$1 ORDER BY id',[orderId])
+ const {rows:[shipment]}=await db().query('SELECT parcel FROM hash_shipment WHERE order_id=$1',[orderId])
  const timeline:any[]=[{id:'placed',status:'placed',at:o.order_placed_at||o.created_at,note:'Order placed'}]
  if(o.paid_at)timeline.push({id:'paid',status:'payment_confirmed',at:o.paid_at,note:'Payment confirmed'})
  timeline.push(...events.map(e=>({id:String(e.id),status:e.status,at:e.created_at,note:e.note,...e.details})))
  if(o.completed_at)timeline.push({id:'completed',status:o.delivery_kind==='service'?'completed':'delivered',at:o.completed_at,note:'Completion confirmed with customer OTP'})
  if(o.canceled_at)timeline.push({id:'canceled',status:'canceled',at:o.canceled_at,note:'Order canceled'})
  timeline.sort((a,b)=>+new Date(a.at)-+new Date(b.at))
- return {order_id:orderId,kind:o.delivery_kind,status:o.canceled_at?'canceled':o.completed_at?(o.delivery_kind==='service'?'completed':'delivered'):o.delivery_status,revision:o.delivery_revision,paid:!!o.paid_at,on_hold:!!o.hold_reason,completion_eligible:!!o.paid_at&&!o.completed_at&&!o.hold_reason&&!o.canceled_at&&!o.reviewed_canceled,courier:o.delivery_details.courier||null,tracking_number:o.delivery_details.tracking_number||null,tracking_url:o.delivery_details.tracking_url||null,expected_delivery:o.delivery_details.expected_delivery||null,timeline}
+ return {delivery_address:shipment?.parcel?.delivery_address||null,order_id:orderId,kind:o.delivery_kind,status:o.canceled_at?'canceled':o.completed_at?(o.delivery_kind==='service'?'completed':'delivered'):o.delivery_status,revision:o.delivery_revision,paid:!!o.paid_at,on_hold:!!o.hold_reason,completion_eligible:!!o.paid_at&&!o.completed_at&&!o.hold_reason&&!o.canceled_at&&!o.reviewed_canceled,courier:o.delivery_details.courier||null,tracking_number:o.delivery_details.tracking_number||null,tracking_url:o.delivery_details.tracking_url||null,expected_delivery:o.delivery_details.expected_delivery||null,timeline}
 }
 export async function updateDelivery(container:any,a:any,b:z.infer<typeof deliveryCommand>){
  const {rows:[owned]}=await db().query('SELECT vendor_id FROM hash_order WHERE order_id=$1',[b.order_id]);if(!owned)fail('Order not found');own(a,owned.vendor_id)

@@ -105,6 +105,16 @@ export async function migrate() {
     invoice_reference text, revision integer NOT NULL DEFAULT 1, carrier_status text,
     carrier_at timestamptz, synced_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
   );
+  CREATE TABLE IF NOT EXISTS hash_dispatch_location (
+    name text PRIMARY KEY,vendor_id text NOT NULL REFERENCES hash_vendor(id),address jsonb NOT NULL,
+    status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE TABLE IF NOT EXISTS hash_pickup_request (
+    id bigserial PRIMARY KEY,location_name text NOT NULL,pickup_date text NOT NULL,
+    status text NOT NULL,carrier_id text,created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(location_name,pickup_date)
+  );
+  ALTER TABLE hash_shipment ADD COLUMN IF NOT EXISTS pickup_request_id bigint REFERENCES hash_pickup_request(id);
   CREATE TABLE IF NOT EXISTS hash_delivery_event (
     id bigserial PRIMARY KEY,order_id text NOT NULL REFERENCES hash_order(order_id),status text NOT NULL,
     note text NOT NULL DEFAULT '',details jsonb NOT NULL DEFAULT '{}',created_at timestamptz NOT NULL DEFAULT now()

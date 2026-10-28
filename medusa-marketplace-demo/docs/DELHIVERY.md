@@ -8,7 +8,7 @@ Hash Operations and vendors use **Shipping** in the partner portal. The connecto
 2. Register each vendor's pickup address in Delhivery One. Assign its exact, case-sensitive pickup-location name and pincode to that vendor in Hash Shipping. This assignment does not itself register a warehouse with Delhivery.
 3. Vendors enter packed weight, dimensions, invoice number, e-waybill when applicable, and Surface/Express service. Hash checks prepaid destination serviceability and obtains a rate estimate.
 4. In Orders, the vendor accepts the order, marks Processing, then Ready to Ship. The vendor explicitly books the quoted shipment. The quote expires after 15 minutes and an address/item change requires a fresh quote. The booking transmits the customer's address/phone to Delhivery. It may incur a real carrier charge.
-5. Download the **Carrier PDF label** and schedule collection in Delhivery One. The earlier Hash A6 address sticker is still available but does not replace a carrier label with the required barcode. Pickup scheduling, pickup-address registration and shipment cancellation are currently performed in Delhivery One.
+5. The **Book Delhivery pickup** action creates the AWB and requests collection for the selected date at 2 pm India time. Download the **Carrier PDF label**. The earlier Hash A6 address sticker is still available but does not replace a carrier label with the required barcode. Review both delivery and pickup addresses before booking. An edited pickup address creates a shipment-specific registered warehouse, without changing other orders. Rescheduling and shipment cancellation remain in Delhivery One.
 
 ## Delivery payer and actual charges, no markup
 
@@ -46,3 +46,15 @@ POST actions:
 `label` returns a temporary carrier PDF URL containing recipient information. Treat it as private and never log/publish it. Tokens must remain server-side.
 
 Official contracts: [Delhivery B2C API documentation](https://one.delhivery.com/developer-portal/documents/b2c/), [shipment creation](https://one.delhivery.com/developer-portal/document/b2c/detail/order-creation), [tracking](https://one.delhivery.com/developer-portal/document/b2c/detail/order-tracking).
+
+## Simplified dispatch
+Orders shows **Accept order → Start processing → Ready to ship → Book Delhivery pickup**. Parcel measurements come from listing packed-unit measurements; courier selection is automatic (Delhivery Surface). Review both addresses and select pickup date. Address edits are frozen after booking. Orders requiring an e-waybill must supply it before dispatch.
+
+`POST /admin/hash/shipping` actions:
+- `prepare_dispatch`: `order_id`, optional `delivery_address`, `pickup_address`. Address fields: first_name, last_name, address_1, address_2, city, province, postal_code, phone, country_code (`in`). Returns shipment revision/estimate, pickup and delivery_address.
+- `dispatch`: `order_id`, `revision`, `pickup_date` (YYYY-MM-DD, within 30 days, minimum one hour before 14:00 Asia/Kolkata), optional `ewaybill`, `confirmed:true`.
+- `resolve_dispatch`: Hash super admin only; `kind` location/pickup, `id`, `outcome` confirmed/absent, evidence `note`, `confirmed:true`; confirmed pickup additionally requires `carrier_id`. Only unresolved requests older than two minutes are eligible.
+
+Pickup requests are shared per location/date and durably linked to shipments. Retries reuse existing claims. Uncertain responses require verification in Delhivery One and resolution in Hash Operations → Shipping → Carrier confirmations needing review. Never mark absent based only on a timeout.
+
+Actual charges remain reconciled from courier invoices without markup. Address changes do not recharge the customer; differences are reconciled with vendor earnings. No payment or shipment is created by automated tests.

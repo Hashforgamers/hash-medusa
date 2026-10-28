@@ -41,7 +41,7 @@ Continue to use `GET /store/orders` for history and `/store/orders/:id` for line
 
 ## Partner / Hash Operations
 
-Orders → Details → Update tracking. Only the owning active vendor or a Hash super admin can change a record. Sequential stage transitions, payment/hold checks and revision checks are enforced on the server. Notes are visible to the customer. Editing the same stage is allowed for a corrected courier/link/date or new note. No manual Delivered button is provided.
+Physical orders: use the primary order-row buttons Accept order, Start processing, Ready to ship, then Book Delhivery pickup. Service orders retain Details → Update tracking. Only the owning active vendor or a Hash super admin can change a record. Sequential stage transitions, payment/hold checks and revision checks are enforced on the server. Notes are visible to the customer. Editing the same stage is allowed for a corrected courier/link/date or new note. No manual Delivered button is provided.
 
 `POST /admin/hash` with action `update_delivery`, `order_id`, `revision`, `status`, `courier`, `tracking_number`, `tracking_url`, `expected_delivery`, `note`. All text fields are bounded; tracking URLs must use HTTPS. Obtain current revision and details from `GET /admin/hash?order_id=...`. On conflict refresh rather than retrying stale input.
 

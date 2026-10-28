@@ -1,0 +1,2 @@
+import { z } from 'zod'
+export const dispatchAddress=z.object({first_name:z.string().trim().min(1).max(100),last_name:z.string().trim().max(100).default(''),address_1:z.string().trim().min(5).max(250),address_2:z.string().trim().max(250).default(''),city:z.string().trim().min(2).max(100),province:z.string().trim().min(2).max(100),postal_code:z.string().regex(/^[1-9]\d{5}$/),phone:z.string().transform(v=>v.replace(/[\s()-]/g,'')).pipe(z.string().regex(/^(?:\+91)?[6-9]\d{9}$/)),country_code:z.literal('in').default('in')})

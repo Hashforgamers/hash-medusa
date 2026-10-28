@@ -1,3 +1,4 @@
+import { dispatchAddress } from './shipping-address'
 import { z } from 'zod'
 import { createHash } from 'crypto'
 import { db,transaction,audit } from './db'
@@ -8,6 +9,9 @@ import { applyShippingFee } from './shipping-fees'
 const id=z.string().min(1).max(200)
 export const parcelSchema=z.object({weight_g:z.number().int().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150),mode:z.enum(['Surface','Express']),invoice:z.string().trim().min(1).max(50),ewaybill:z.string().regex(/^\d{12}$/).or(z.literal('')).default('')})
 export const shippingCommands=z.discriminatedUnion('action',[
+ z.object({action:z.literal('resolve_dispatch'),kind:z.enum(['location','pickup']),id,note:z.string().trim().min(20).max(1000),outcome:z.enum(['confirmed','absent']),carrier_id:z.string().regex(/^[1-9]\d*$/).optional(),confirmed:z.literal(true)}),
+ z.object({action:z.literal('prepare_dispatch'),order_id:id,delivery_address:dispatchAddress.optional(),pickup_address:dispatchAddress.optional()}),
+ z.object({action:z.literal('dispatch'),order_id:id,revision:z.number().int().positive(),pickup_date:z.string(),ewaybill:z.string().regex(/^\d{12}$/).or(z.literal('')).default(''),confirmed:z.literal(true)}),
  z.object({action:z.literal('payer'),vendor_id:id,payer:z.enum(['seller','customer']),revision:z.number().int().positive()}),
  z.object({action:z.literal('settings'),token:z.string().trim().min(16).max(1000),revision:z.number().int().nonnegative()}),
  z.object({action:z.literal('enabled'),active:z.boolean(),revision:z.number().int().positive()}),
@@ -19,9 +23,9 @@ export const shippingCommands=z.discriminatedUnion('action',[
  z.object({action:z.literal('reset_booking'),order_id:id,note:z.string().trim().min(20).max(1000),confirmed:z.literal(true)}),
  z.object({action:z.literal('invoice'),order_id:id,revision:z.number().int().positive(),amount_paise:z.number().int().min(0).max(10000000),reference:z.string().trim().min(3).max(150),note:z.string().trim().min(10).max(1000),confirmed:z.literal(true)}),
 ])
-export async function delhiveryRequest(token:string,path:string,body?:any){
- if(!(/^\/(api|c\/api)\//.test(path))||path.includes('://'))throw Error('Invalid carrier path')
- const r=await fetch('https://track.delhivery.com'+path,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(25000),headers:{Authorization:'Token '+token,Accept:'application/json',...(body?{'Content-Type':'application/x-www-form-urlencoded'}:{})},...(body?{body:new URLSearchParams({format:'json',data:JSON.stringify(body)}).toString()}: {})})
+export async function delhiveryRequest(token:string,path:string,body?:any,json=false){
+ if(!(path==='/fm/request/new/'||(/^\/(api|c\/api)\//.test(path)))||path.includes('://'))throw Error('Invalid carrier path')
+ const r=await fetch('https://track.delhivery.com'+path,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(25000),headers:{Authorization:'Token '+token,Accept:'application/json',...(body?{'Content-Type':json?'application/json':'application/x-www-form-urlencoded'}:{})},...(body?{body:json?JSON.stringify(body):new URLSearchParams({format:'json',data:JSON.stringify(body)}).toString()}: {})})
  if(!r.ok)throw Error(`Delhivery request failed (${r.status}); check account access or try again later`)
  const text=await r.text();if(text.length>2000000)throw Error('Carrier response too large');try{return JSON.parse(text)}catch{throw Error('Unexpected carrier response')}
 }
@@ -32,7 +36,8 @@ export async function shippingOverview(a:any){
  db().query('SELECT * FROM hash_shipment WHERE ($1::text IS NULL OR vendor_id=$1) ORDER BY created_at DESC LIMIT 500',[filter]),
  db().query('SELECT * FROM hash_shipping_pickup WHERE ($1::text IS NULL OR vendor_id=$1)',[filter]),
  db().query("SELECT active,verified_at,revision FROM hash_shipping_config WHERE id='delhivery'")])
- return {shipments,pickups,settings:settings||{active:false,revision:0},fee_policy:'Actual invoiced charge, no markup; remaining order payouts held until reconciled'}
+ const reviews=a.superAdmin?{locations:(await db().query("SELECT name,status,created_at FROM hash_dispatch_location WHERE status<>'confirmed'")).rows,requests:(await db().query("SELECT id,location_name,pickup_date,status,created_at FROM hash_pickup_request WHERE status<>'confirmed'")).rows}:null
+ return {reviews,shipments,pickups,settings:settings||{active:false,revision:0},fee_policy:'Actual invoiced charge, no markup; remaining order payouts held until reconciled'}
 }
 async function ownedOrder(a:any,id:string){const {rows:[o]}=await db().query('SELECT * FROM hash_order WHERE order_id=$1',[id]);if(!o)fail('Order not found');own(a,o.vendor_id);return o}
 function eligible(o:any){if(o.currency_code!=='inr'||o.delivery_kind!=='product'||!o.paid_at||o.hold_reason||o.canceled_at||o.completed_at||o.payment_mode!=='hash_collects')fail('Shipping requires a paid, unheld INR physical-product order collected by Hash')}
@@ -70,20 +75,21 @@ export async function shippingAction(container:any,a:any,b:any){
  }
  await reconcileOrder(container,b.order_id);const o=await ownedOrder(a,b.order_id);eligible(o)
  const {data:[order]}=await container.resolve('query').graph({entity:'order',fields:['id','display_id','total','shipping_address.*','items.title','items.quantity'],filters:{id:b.order_id}})
- const addr=order?.shipping_address
+ const savedAddress=b.action==='book'?(await db().query('SELECT parcel FROM hash_shipment WHERE order_id=$1',[b.order_id])).rows[0]?.parcel?.delivery_address:null
+ const addr=b.delivery_address||savedAddress||order?.shipping_address
  if(!addr||addr.country_code?.toLowerCase()!=='in'||!/^\d{6}$/.test(addr.postal_code)||!addr.phone||!addr.address_1||!addr.city)fail('A complete Indian shipping address and phone are required')
  if(b.action==='quote'){
-  const {rows:[pickup]}=await db().query('SELECT * FROM hash_shipping_pickup WHERE vendor_id=$1',[o.vendor_id]);if(!pickup)fail('Hash must assign a registered Delhivery pickup location first')
+  const {rows:[storedPickup]}=await db().query('SELECT * FROM hash_shipping_pickup WHERE vendor_id=$1',[o.vendor_id]);const pickup=b.pickup_override||storedPickup;if(!pickup)fail('Hash must assign a registered Delhivery pickup location first')
   const service=await delhiveryRequest(cfg.token,'/c/api/pin-codes/json/?'+new URLSearchParams({filter_codes:addr.postal_code}));const pin=service.delivery_codes?.find((p:any)=>String(p.postal_code?.pin)===addr.postal_code)?.postal_code
   if(pin?.pre_paid!=='Y'||pin.remarks)fail('Delhivery prepaid delivery is not available for this pincode')
   const p=b.parcel;const quote=estimatePaise(await delhiveryRequest(cfg.token,'/api/kinko/v1/invoice/charges/.json?'+new URLSearchParams({md:p.mode==='Surface'?'S':'E',ss:'Delivered',d_pin:addr.postal_code,o_pin:pickup.pincode,cgm:String(p.weight_g),pt:'Pre-paid',l:String(p.length_cm),b:String(p.width_cm),h:String(p.height_cm),ipkg_type:'box'})))
-  return transaction(`order:${b.order_id}`,async c=>{const {rows:[current]}=await c.query('SELECT * FROM hash_shipment WHERE order_id=$1',[b.order_id]);if(current&&current.status!=='quoted')fail('A shipment already exists; refresh its status instead of booking again');const fingerprint=createHash('sha256').update(JSON.stringify(order)).digest('hex');const {rows:[s]}=await c.query("INSERT INTO hash_shipment(order_id,vendor_id,parcel,pickup,quote_paise) VALUES($1,$2,$3,$4,$5) ON CONFLICT(order_id) DO UPDATE SET parcel=$3,pickup=$4,quote_paise=$5,quoted_at=now(),revision=hash_shipment.revision+1 RETURNING *",[b.order_id,o.vendor_id,JSON.stringify({...p,fingerprint}),JSON.stringify(pickup),quote]);return s})
+  return transaction(`order:${b.order_id}`,async c=>{const {rows:[current]}=await c.query('SELECT * FROM hash_shipment WHERE order_id=$1',[b.order_id]);if(current&&current.status!=='quoted')fail('A shipment already exists; refresh its status instead of booking again');const fingerprint=createHash('sha256').update(JSON.stringify(order)).digest('hex');const {rows:[s]}=await c.query("INSERT INTO hash_shipment(order_id,vendor_id,parcel,pickup,quote_paise) VALUES($1,$2,$3,$4,$5) ON CONFLICT(order_id) DO UPDATE SET parcel=$3,pickup=$4,quote_paise=$5,quoted_at=now(),revision=hash_shipment.revision+1 RETURNING *",[b.order_id,o.vendor_id,JSON.stringify({...p,fingerprint,delivery_address:b.delivery_address||null}),JSON.stringify(pickup),quote]);return s})
  }
  if(b.action==='book'){
   const s=await transaction(`order:${b.order_id}`,async c=>{const {rows:[current]}=await c.query('SELECT * FROM hash_order WHERE order_id=$1 FOR UPDATE',[b.order_id]);eligible(current);if(current.delivery_status!=='ready_to_ship')fail('Accept, process and mark the order Ready to Ship before booking pickup');if((await c.query("SELECT 1 FROM hash_settlement WHERE order_id=$1 AND status='processing'",[b.order_id])).rowCount)fail('Wait for the processing payout to finish');const {rows:[s]}=await c.query('SELECT * FROM hash_shipment WHERE order_id=$1 FOR UPDATE',[b.order_id]);if(!s||s.status!=='quoted'||s.revision!==b.revision)fail('Shipment already submitted or quote changed; refresh');if(Date.now()-new Date(s.quoted_at).getTime()>15*60000)fail('Quote expired; calculate again');if(createHash('sha256').update(JSON.stringify(order)).digest('hex')!==s.parcel.fingerprint)fail('Order address or items changed; calculate again');if(Number(order.total)>=50000&&!s.parcel.ewaybill)fail('Enter the e-waybill for this shipment');await c.query("UPDATE hash_shipment SET status='booking',revision=revision+1 WHERE order_id=$1",[b.order_id]);await audit(c,a.id,'shipment_booking_requested',b.order_id,{quote_paise:s.quote_paise});return s})
-  const p=s.parcel
+  const p=s.parcel,shippingAddr=s.parcel.delivery_address||addr
   try{
-   const response=await delhiveryRequest(cfg.token,'/api/cmu/create.json',{shipments:[{order:b.order_id,name:[addr.first_name,addr.last_name].filter(Boolean).join(' '),add:[addr.address_1,addr.address_2].filter(Boolean).join(', '),pin:addr.postal_code,city:addr.city,state:addr.province,country:'India',phone:addr.phone,payment_mode:'Prepaid',cod_amount:0,total_amount:order.total,products_desc:order.items.map((i:any)=>i.title).join(', ').slice(0,500),quantity:String(order.items.reduce((n:number,i:any)=>n+Number(i.quantity),0)),weight:p.weight_g,shipment_length:p.length_cm,shipment_width:p.width_cm,shipment_height:p.height_cm,shipping_mode:p.mode,seller_inv:p.invoice,ewbn:p.ewaybill}],pickup_location:{name:s.pickup.name}})
+   const response=await delhiveryRequest(cfg.token,'/api/cmu/create.json',{shipments:[{order:b.order_id,name:[shippingAddr.first_name,shippingAddr.last_name].filter(Boolean).join(' '),add:[shippingAddr.address_1,shippingAddr.address_2].filter(Boolean).join(', '),pin:shippingAddr.postal_code,city:shippingAddr.city,state:shippingAddr.province,country:'India',phone:shippingAddr.phone,payment_mode:'Prepaid',cod_amount:0,total_amount:order.total,products_desc:order.items.map((i:any)=>i.title).join(', ').slice(0,500),quantity:String(order.items.reduce((n:number,i:any)=>n+Number(i.quantity),0)),weight:p.weight_g,shipment_length:p.length_cm,shipment_width:p.width_cm,shipment_height:p.height_cm,shipping_mode:p.mode,seller_inv:p.invoice,ewbn:p.ewaybill}],pickup_location:{name:s.pickup.name}})
    const pack=response.packages?.[0];if(response.success!==true||pack?.status!=='Success'||!/^\d{8,20}$/.test(String(pack.waybill)))throw Error('Unconfirmed booking')
    await attachWaybill(b.order_id,String(pack.waybill),a.id)
    return {ok:true,message:'Shipment booked. Schedule pickup in Delhivery One and print the carrier label.'}
