@@ -93,6 +93,7 @@ export async function migrate() {
     id text PRIMARY KEY, secret_encrypted text NOT NULL, active boolean NOT NULL DEFAULT false,
     verified_at timestamptz, revision integer NOT NULL DEFAULT 1
   );
+  ALTER TABLE hash_shipping_config ADD COLUMN IF NOT EXISTS wallet_details jsonb;
   CREATE TABLE IF NOT EXISTS hash_shipping_pickup (
     vendor_id text PRIMARY KEY REFERENCES hash_vendor(id), name text NOT NULL, pincode text NOT NULL,
     revision integer NOT NULL DEFAULT 1
@@ -106,6 +107,7 @@ export async function migrate() {
     carrier_at timestamptz, synced_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
   );
   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS cancellation_request jsonb;
+  ALTER TABLE hash_shipment ADD COLUMN IF NOT EXISTS booking_error text;
   CREATE TABLE IF NOT EXISTS hash_dispatch_location (
     name text PRIMARY KEY,vendor_id text NOT NULL REFERENCES hash_vendor(id),address jsonb NOT NULL,
     status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now()

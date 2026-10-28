@@ -72,3 +72,12 @@ Contract: https://one.delhivery.com/developer-portal/document/b2c/detail/order-c
 
 ### Missing unit measurements at dispatch
 Book Delhivery pickup now asks for the actual complete parcel weight (grams, up to 30000) and outer length/width/height (cm, each up to 150) when listing measurements are missing or the computed parcel exceeds limits. This shipment-only override does not change listing approval, unit defaults, paid checkout totals, or customer delivery charges. Save unit defaults through Listings → Edit for future customer-paid checkout quotes. `prepare_dispatch` accepts optional `packed_parcel: {weight_g,length_cm,width_cm,height_cm}` and otherwise returns `requires_packed_parcel:true` when measurements are needed.
+
+## Booking outcomes and operator guidance
+Orders now exposes shipment and pickup state before offering actions. An unconfirmed booking disables repeat booking; confirmed or uncertain pickup requests disable duplicate pickup requests. Refresh carrier tracking is safe and read-only; it may recover an AWB by order reference. No record found is not proof of rejection: Operations must verify the reference in the correct Delhivery account before Resolve missing booking.
+
+Explicit zero-package/failed-package carrier responses without a waybill return a rejected result and retain a friendly reason (funding, pickup mapping or delivery details). Fix that cause and obtain a fresh quote. Ambiguous responses remain locked. Do not manually create a duplicate shipment while verification is pending.
+
+Operations Shipping includes a **Delhivery account & recharge** panel. The public B2C contract does not provide a verified wallet feed in this integration. Balance, account minimum and alert threshold are operator-verified snapshots with timestamp, evidence note and audit entry; stale snapshots are labelled. Unreconciled shipment estimates are shown separately and are not deducted to invent a current balance. Recharges and the transaction ledger link to Delhivery One. Live balance/ledger integration requires an approved Delhivery wallet API contract and credentials.
+
+Listing images upload automatically to Cloudinary when selected. Submit is blocked during an upload or until a failed upload is retried/replaced. Saving the listing remains the explicit final action.

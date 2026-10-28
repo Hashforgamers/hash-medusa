@@ -39,7 +39,7 @@ export async function dispatchOrder(container:any,a:any,b:any){
 
   if(b.ewaybill){await transaction(`order:${b.order_id}`,async c=>{if(!(await c.query("UPDATE hash_shipment SET parcel=jsonb_set(parcel,'{ewaybill}',to_jsonb($2::text)) WHERE order_id=$1 AND status='quoted' AND revision=$3",[b.order_id,b.ewaybill,b.revision])).rowCount)fail('Shipment changed; refresh')})}
   const result=await shippingAction(container,a,{action:'book',order_id:b.order_id,revision:b.revision,confirmed:true})
-  if(result?.status==='booking')return result
+  if(result?.status==='booking'||result?.status==='rejected')return result
   s=(await db().query('SELECT * FROM hash_shipment WHERE order_id=$1',[b.order_id])).rows[0]
  }
  if(s.status!=='booked'||!s.waybill)fail('Booking is under review; refresh carrier tracking before retrying')

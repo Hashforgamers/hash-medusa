@@ -1,6 +1,12 @@
-import { estimatePaise,carrierStage,parcelSchema,shippingCommands,delhiveryRequest } from '../delhivery'
+import { estimatePaise,carrierStage,parcelSchema,shippingCommands,delhiveryRequest,definiteBookingRejection } from '../delhivery'
 import { shippingAllocation } from '../shipping-fees'
 describe('Delhivery safety and vendor charges',()=>{
+ test('only explicit empty/rejected manifests are safe to retry',()=>{
+  expect(definiteBookingRejection({success:false,package_count:0,packages:[],rmk:'Please recharge wallet'})).toContain('funding')
+  expect(definiteBookingRejection({success:false,packages:[{status:'Fail',remarks:['Pickup location not found']}]})).toContain('pickup location')
+  for(const r of [{},{success:false},{success:false,packages:[]},{success:false,package_count:0,packages:[{status:'Success',waybill:'123456789'}]}])expect(definiteBookingRejection(r)).toBeNull()
+ })
+
  test('charges actual shipping without markup and tracks overpayment',()=>{expect(shippingAllocation(10000,1500,5000,5000)).toEqual({available:3500,payment:3500,recovery:0});expect(shippingAllocation(10000,1500,10000,5000)).toEqual({available:0,payment:0,recovery:1500})})
  test('a reduced or zero courier invoice releases the correct remainder',()=>{expect(shippingAllocation(10000,0,5000,5000).available).toBe(5000);expect(shippingAllocation(3000,1500,5000,1500).recovery).toBe(3500)})
  test('estimate rejects missing, ambiguous, free and negative charges',()=>{expect(estimatePaise([{total_amount:51.12}])).toBe(5112);for(const v of [[],{},[{total_amount:0}],[{total_amount:-1}],[{total_amount:10},{total_amount:20}]])expect(()=>estimatePaise(v)).toThrow()})
