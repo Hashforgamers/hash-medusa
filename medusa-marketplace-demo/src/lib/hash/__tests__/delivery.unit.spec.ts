@@ -7,8 +7,11 @@ const order:any={order_id:'order_1',vendor_id:'v1',paid_at:new Date(),delivery_k
 describe('manual customer tracking',()=>{
  beforeEach(()=>jest.clearAllMocks())
  test('requires sequential stages and cannot mark delivered without OTP',()=>{
-  expect(()=>validateDeliveryTransition(order,'preparing')).not.toThrow()
-  for(const status of ['shipped','out_for_delivery','delivered','completed'])expect(()=>validateDeliveryTransition(order,status)).toThrow()
+  expect(()=>validateDeliveryTransition(order,'accepted')).not.toThrow()
+  expect(()=>validateDeliveryTransition({...order,delivery_status:'accepted'},'preparing')).not.toThrow()
+  expect(()=>validateDeliveryTransition({...order,delivery_status:'preparing'},'ready_to_ship')).not.toThrow()
+  expect(()=>validateDeliveryTransition({...order,delivery_status:'ready_to_ship'},'shipped')).not.toThrow()
+  for(const status of ['preparing','ready_to_ship','shipped','out_for_delivery','delivered','completed'])expect(()=>validateDeliveryTransition(order,status)).toThrow()
   expect(()=>validateDeliveryTransition({...order,delivery_status:'delivery_attempted'},'out_for_delivery')).not.toThrow()
  })
  test('supports distinct service stages',()=>{

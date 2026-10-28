@@ -20,6 +20,14 @@ export function packedEstimate(items:any[],listings:any[]){
  return {weight_g:Math.ceil(weight),length_cm:length,width_cm:width,height_cm:height}
 }
 export async function checkoutShippingQuote(cart:any){
+ // Medusa 2.10's standalone calculate-price workflow omits currency_code.
+ // Resolve the persisted currency rather than assuming INR or trusting client data.
+ if(!cart.currency_code){
+  const {rows:[stored]}=await db().query('SELECT currency_code FROM cart WHERE id=$1 AND deleted_at IS NULL',[cart.id])
+  if(!stored)fail('Cart not found; refresh checkout')
+  cart={...cart,currency_code:stored.currency_code}
+ }
+
  const {vendor,listings,physical}=await cartShippingVendor(cart)
  if(cart.currency_code!=='inr')fail('Hash calculated delivery currently supports INR only')
  const fingerprint=cartFingerprint(cart)

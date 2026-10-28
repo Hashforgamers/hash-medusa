@@ -45,8 +45,10 @@ Use `GET /store/orders` for history and `GET /store/orders/:id` for items, addre
 
 | Value | App label |
 | --- | --- |
-| placed | Order placed |
-| preparing | Preparing your order |
+| placed | New Order |
+| accepted | Accepted |
+| preparing | Processing |
+| ready_to_ship | Ready to Ship |
 | shipped | Shipped |
 | out_for_delivery | Out for delivery |
 | delivery_attempted | Delivery attempted |
@@ -66,10 +68,18 @@ When `order.completion_eligible` is true, offer **Show completion OTP**: `POST /
 
 In partner **Shipping**, the owner chooses **Customer pays delivery charges** or **Seller pays delivery charges**. On Listings, save packed-unit grams and dimensions in centimetres. Hash Operations assigns the registered Delhivery pickup name/pincode. No code change is needed for these settings.
 
-Vendor books the shipment explicitly, downloads its carrier PDF label, and schedules pickup in Delhivery One. Orders → Details also has an A6 address sticker with recipient contact/address. Both are private vendor tools, not customer-app APIs. Carrier labels and customer addresses must never be public assets.
+Vendor accepts the order after confirming stock, marks it Processing, then Ready to Ship. Delhivery booking requires Ready to Ship. Booking creates an AWB but does not mark the parcel Shipped; carrier pickup/transit does. Vendor books the shipment explicitly, downloads its carrier PDF label, and schedules pickup in Delhivery One. Orders → Details also has an A6 address sticker with recipient contact/address. Both are private vendor tools, not customer-app APIs. Carrier labels and customer addresses must never be public assets.
 
 Hash Operations reconciles the actual invoice without markup. Customer shipping collected is credited to the order's vendor earnings without platform commission; actual carrier costs are deducted. Seller-paid orders collect ₹0 shipping and deduct the full actual charge from seller earnings. Remaining payouts wait for invoice reconciliation after booking. Existing paid transfers stay immutable; excess costs create a recovery balance.
 
 ## App release checklist
 
 Test seller-paid ₹0, customer-paid quoted fee, quantity/address change, unavailable pincode, missing package dimensions, shipping-inclusive Razorpay total, completion retry without double charge, own-order history/tracking, cross-customer denial, attempted delivery, carrier-delivered awaiting OTP, and final OTP completion. Do not test by charging a real customer or booking a real shipment without approval.
+
+## In-app delivery notifications
+
+Use stable `tracking.timeline[].id` values to detect new events after each successful poll. Persist the last seen event IDs per customer/order; show an in-app delivery update once for a new event, and mark it read when the customer opens the tracker. Do not notify on the initial historical fetch. Clear customer-specific cache on logout. This supports visible-app updates only. Background push/SMS/email delivery is not configured by this release; the app team must integrate its notification transport before advertising background delivery notifications.
+
+## Checkout currency fix
+
+Medusa 2.10's standalone `POST /store/shipping-options/:id/calculate` path omits `currency_code` from provider context. Hash now reads the persisted cart currency when absent. Actual non-INR carts remain unsupported by this Delhivery adapter; never force an arbitrary cart into INR or suppress the error in the app.

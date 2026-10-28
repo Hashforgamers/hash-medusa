@@ -5,13 +5,13 @@ import { reconcileOrder } from './settlements'
 
 export const deliveryCommand = z.object({
  action:z.literal('update_delivery'),order_id:z.string().min(1).max(200),revision:z.number().int().nonnegative(),
- status:z.enum(['placed','preparing','shipped','out_for_delivery','delivery_attempted','ready_for_service','in_progress']),
+ status:z.enum(['placed','accepted','preparing','ready_to_ship','shipped','out_for_delivery','delivery_attempted','ready_for_service','in_progress']),
  courier:z.string().trim().max(100).default(''),tracking_number:z.string().trim().max(150).default(''),
  tracking_url:z.union([z.literal(''),z.string().url().max(2000).refine(s=>{const u=new URL(s);return u.protocol==='https:'&&!u.username&&!u.password},'Use an HTTPS tracking URL without credentials')]).default(''),
  expected_delivery:z.union([z.literal(''),z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s=>{const d=new Date(s);return !isNaN(+d)&&d.toISOString().slice(0,10)===s},'Invalid date')]).default(''),
  note:z.string().trim().max(500).default(''),
 })
-const productSteps=['placed','preparing','shipped','out_for_delivery','delivery_attempted']
+const productSteps=['placed','accepted','preparing','ready_to_ship','shipped','out_for_delivery','delivery_attempted']
 const serviceSteps=['placed','preparing','ready_for_service','in_progress']
 export function validateDeliveryTransition(o:any,next:string){
  if(o.completed_at||o.canceled_at||o.reviewed_canceled)fail('This order is already completed or canceled')
@@ -20,7 +20,7 @@ export function validateDeliveryTransition(o:any,next:string){
  if(!allowed.includes(next))fail('This stage does not apply to this order')
  const current=o.delivery_status||'placed'
  if(current===next)return
- const transitions:Record<string,string[]>={placed:['preparing'],preparing:o.delivery_kind==='service'?['ready_for_service']:['shipped'],shipped:['out_for_delivery','delivery_attempted'],out_for_delivery:['delivery_attempted'],delivery_attempted:['out_for_delivery'],ready_for_service:['in_progress'],in_progress:[]}
+ const transitions:Record<string,string[]>={placed:o.delivery_kind==='service'?['preparing']:['accepted'],accepted:['preparing'],preparing:o.delivery_kind==='service'?['ready_for_service']:['ready_to_ship'],ready_to_ship:['shipped'],shipped:['out_for_delivery','delivery_attempted'],out_for_delivery:['delivery_attempted'],delivery_attempted:['out_for_delivery'],ready_for_service:['in_progress'],in_progress:[]}
  if(!transitions[current]?.includes(next))fail('Update stages in order; refresh the order before continuing')
 }
 export async function tracking(orderId:string,customerId?:string){

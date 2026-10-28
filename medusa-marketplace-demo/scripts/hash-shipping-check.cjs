@@ -45,6 +45,7 @@ const container={resolve:name=>({graph:async({filters})=>({data:filters.customer
   await db().query('DELETE FROM hash_checkout_shipping_receipt WHERE cart_id=$1',[checkout.id]);
   const quote=await shippingAction(container,actor,{action:'quote',order_id:key,parcel:{weight_g:500,length_cm:20,width_cm:10,height_cm:5,mode:'Surface',invoice:'INV-local',ewaybill:''}});assert.equal(Number(quote.quote_paise),2500);
   await assert.rejects(()=>shippingAction(container,{...actor,vendor_id:'other'},{action:'book',order_id:key,revision:quote.revision,confirmed:true}));assert.equal(manifests,0);
+  await db().query("UPDATE hash_order SET delivery_status='ready_to_ship' WHERE order_id=$1",[key]);
   await shippingAction(container,actor,{action:'book',order_id:key,revision:quote.revision,confirmed:true});assert.equal(manifests,1);
   await assert.rejects(()=>shippingAction(container,actor,{action:'book',order_id:key,revision:quote.revision,confirmed:true}));assert.equal(manifests,1);
   await shippingAction(container,actor,{action:'sync',order_id:key});const tracked=await tracking(key,customer);assert(tracked.timeline.some(e=>e.status==='carrier_delivered'));assert.notEqual(tracked.status,'delivered');
@@ -55,9 +56,9 @@ const container={resolve:name=>({graph:async({filters})=>({data:filters.customer
  await assert.rejects(()=>tracking(key,'another-customer'));
  const base={action:'update_delivery',order_id:key,courier:'Manual courier',tracking_number:'SAMPLE123',tracking_url:'https://example.com/track/SAMPLE123',expected_delivery:'2026-11-01',note:'Packed and ready'};
  await assert.rejects(()=>updateDelivery(container,{...actor,vendor_id:'other'}, {...base,revision:0,status:'preparing'}));
- for(const [revision,status] of ['preparing','shipped','out_for_delivery','delivery_attempted','out_for_delivery'].entries())await updateDelivery(container,actor,{...base,revision,status});
+ for(const [revision,status] of ['accepted','preparing','ready_to_ship','shipped','out_for_delivery','delivery_attempted','out_for_delivery'].entries())await updateDelivery(container,actor,{...base,revision,status});
  await assert.rejects(()=>updateDelivery(container,actor,{...base,revision:0,status:'preparing'}));
- t=await tracking(key,customer);assert.equal(t.status,'out_for_delivery');assert.equal(t.timeline.length,7);
+ t=await tracking(key,customer);assert.equal(t.status,'out_for_delivery');assert.equal(t.timeline.length,9);
  const label=shippingLabel({...fixture,paid:true},{name:'Sample Gaming Store',business_details:{address_line1:'45 Example Business Road',city:'Bengaluru',postal_code:'560002',phone:'+91 91111 11111'}},base);
  if(process.env.HASH_LABEL_PREVIEW_PATH)fs.writeFileSync(path.resolve(process.env.HASH_LABEL_PREVIEW_PATH),label);
  const otp=await issueOtp(container,key,customer);await verifyOtp(container,actor,key,otp.code);t=await tracking(key,customer);assert.equal(t.status,'delivered');assert.equal(t.completion_eligible,false);

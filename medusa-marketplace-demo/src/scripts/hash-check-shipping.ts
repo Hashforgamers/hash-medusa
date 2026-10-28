@@ -1,6 +1,6 @@
 // Local Medusa workflow check. No payment session or courier booking is created.
 import assert from 'node:assert/strict'
-import { createProductsWorkflow,deleteProductsWorkflow,createCartWorkflow,addShippingMethodToCartWorkflow,listShippingOptionsForCartWithPricingWorkflow } from '@medusajs/medusa/core-flows'
+import { calculateShippingOptionsPricesWorkflow,createProductsWorkflow,deleteProductsWorkflow,createCartWorkflow,addShippingMethodToCartWorkflow,listShippingOptionsForCartWithPricingWorkflow } from '@medusajs/medusa/core-flows'
 import { db } from '../lib/hash/db'
 import { validateCheckoutShipping } from '../lib/hash/checkout-shipping'
 export default async function check({container}:any){
@@ -17,6 +17,8 @@ export default async function check({container}:any){
   const created=await createCartWorkflow(container).run({input:{region_id:region.id,sales_channel_id:channel.id,items:[{variant_id:product.variants[0].id,quantity:1}],shipping_address:{first_name:'Local',last_name:'Test',address_1:'Local fixture only',city:'Bengaluru',country_code:'in',postal_code:'560001',phone:'9000000000'}}});cart=created.result
   const {result:options}=await listShippingOptionsForCartWithPricingWorkflow(container).run({input:{cart_id:cart.id}})
   const option=options.find((o:any)=>o.provider_id==='hash_delivery_hash_delivery');assert(option,'Calculated provider must be selectable');assert.equal(Number(option.amount),0)
+  const {result:calculated}=await calculateShippingOptionsPricesWorkflow(container).run({input:{cart_id:cart.id,shipping_options:[{id:option.id,data:{}}]}})
+  assert.equal(Number(calculated[0].calculated_amount),0)
   await addShippingMethodToCartWorkflow(container).run({input:{cart_id:cart.id,options:[{id:option.id,data:{}}]}})
   const {data:[saved]}=await q.graph({entity:'cart',fields:['id','currency_code','items.*','shipping_address.*','shipping_methods.*'],filters:{id:cart.id}})
   assert(saved.shipping_methods[0].data.hash_shipping_quote_id);await validateCheckoutShipping(saved)

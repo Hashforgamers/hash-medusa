@@ -25,7 +25,8 @@ Use the existing Medusa customer bearer token from HFG login and `x-publishable-
 }
 ```
 
-- Products: `placed → preparing → shipped → out_for_delivery → delivered`.
+- Products: `placed → accepted → preparing → ready_to_ship → shipped → out_for_delivery → delivered`.
+- Display product stages as New Order, Accepted, Processing, Ready to Ship, Shipped, Out for delivery and Delivered. Vendor acceptance confirms stock/order details. Booking an AWB alone does not mean the courier collected the package.
 - A delivery attempt may be recorded after shipped or out_for_delivery. `delivery_attempted → out_for_delivery` records another attempt.
 - Services: `placed → preparing → ready_for_service → in_progress → completed`.
 - `delivered`/`completed` are generated only after successful customer OTP verification. Existing completion eligibility is retained so a valid direct handoff can complete without fabricating intermediate events.

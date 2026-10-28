@@ -7,7 +7,7 @@ Hash Operations and vendors use **Shipping** in the partner portal. The connecto
 1. Shipping → Connect Delhivery: enter the live token. Hash verifies API access and stores it encrypted, never returning it to the browser. Enable the connection separately. Token replacement disables it until re-enabled.
 2. Register each vendor's pickup address in Delhivery One. Assign its exact, case-sensitive pickup-location name and pincode to that vendor in Hash Shipping. This assignment does not itself register a warehouse with Delhivery.
 3. Vendors enter packed weight, dimensions, invoice number, e-waybill when applicable, and Surface/Express service. Hash checks prepaid destination serviceability and obtains a rate estimate.
-4. The vendor explicitly books the quoted shipment. The quote expires after 15 minutes and an address/item change requires a fresh quote. The booking transmits the customer's address/phone to Delhivery. It may incur a real carrier charge.
+4. In Orders, the vendor accepts the order, marks Processing, then Ready to Ship. The vendor explicitly books the quoted shipment. The quote expires after 15 minutes and an address/item change requires a fresh quote. The booking transmits the customer's address/phone to Delhivery. It may incur a real carrier charge.
 5. Download the **Carrier PDF label** and schedule collection in Delhivery One. The earlier Hash A6 address sticker is still available but does not replace a carrier label with the required barcode. Pickup scheduling, pickup-address registration and shipment cancellation are currently performed in Delhivery One.
 
 ## Delivery payer and actual charges, no markup
