@@ -58,3 +58,14 @@ Orders shows **Accept order → Start processing → Ready to ship → Book Delh
 Pickup requests are shared per location/date and durably linked to shipments. Retries reuse existing claims. Uncertain responses require verification in Delhivery One and resolution in Hash Operations → Shipping → Carrier confirmations needing review. Never mark absent based only on a timeout.
 
 Actual charges remain reconciled from courier invoices without markup. Address changes do not recharge the customer; differences are reconciled with vendor earnings. No payment or shipment is created by automated tests.
+
+## Cancel courier after a customer request
+Orders → **Customer requested cancellation** records a request received by support; the app can submit the customer request directly using the authenticated API in HFG-ORDER-TRACKING.md. This pauses dispatch and unpaid settlements. The order row then offers **Cancel with Delhivery** with explicit confirmation.
+
+The backend fetches fresh carrier tracking before submitting JSON `{waybill,cancellation:"true"}` to `/api/p/edit`. Forward parcels are eligible only at Manifested, In Transit or Pending. In-transit cancellation can become return-to-origin. The API's accepted request does not prove a physical return, refund, or Medusa order cancellation. Existing carrier sync tracks subsequent movement. Shared pickup requests are retained for other parcels.
+
+No shipment booked: dispatch remains stopped and Operations reviews the order/refund. Uncertain carrier response: duplicate submissions are blocked; Hash super admin verifies in Delhivery One and uses **Resolve cancellation** with an evidence note, after two minutes. Financial review closes the settlement hold only after a canceled Medusa order or a reviewed full refund; partial refunds retain the hold. Dispatch and OTP remain blocked for requested cancellations.
+
+Admin shipping actions: `request_cancellation` (`order_id`, `reason`); `cancel_courier` (`order_id`, `confirmed:true`); super-admin `resolve_cancellation` (`order_id`, `accepted`, evidence `note`, `confirmed:true`). Authentication and vendor ownership are enforced server-side.
+
+Contract: https://one.delhivery.com/developer-portal/document/b2c/detail/order-cancellation

@@ -105,6 +105,7 @@ export async function migrate() {
     invoice_reference text, revision integer NOT NULL DEFAULT 1, carrier_status text,
     carrier_at timestamptz, synced_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
   );
+  ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS cancellation_request jsonb;
   CREATE TABLE IF NOT EXISTS hash_dispatch_location (
     name text PRIMARY KEY,vendor_id text NOT NULL REFERENCES hash_vendor(id),address jsonb NOT NULL,
     status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now()

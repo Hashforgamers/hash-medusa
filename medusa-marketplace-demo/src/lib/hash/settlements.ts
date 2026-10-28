@@ -27,7 +27,7 @@ export async function reconcileOrder(container: any, id: string) {
     const captured = captures.reduce((s: number, p: any) => s + minorUnits(p.amount,order.currency_code),0)
     const refunded = payments.flatMap((p: any) => p.refunds || []).reduce((s: number,p: any) => s + minorUnits(p.amount,order.currency_code),0)
     const { rows: [saved] } = await c.query("SELECT * FROM hash_order WHERE order_id=$1",[id])
-    const hold = order.status === "canceled" && !saved.reviewed_canceled ? "Order canceled" : refunded > 0 && refunded !== Number(saved.reviewed_refund_paise) ? "Refund requires Hash review" : total !== Number(saved.reviewed_total_paise ?? saved.total_paise) ? "Order total changed; review required" : captured < total ? "Awaiting full payment capture" : null
+    const hold = saved.cancellation_request && !saved.reviewed_canceled && !(refunded>=total && Number(saved.reviewed_refund_paise)===refunded) ? "Customer cancellation requires review" : order.status === "canceled" && !saved.reviewed_canceled ? "Order canceled" : refunded > 0 && refunded !== Number(saved.reviewed_refund_paise) ? "Refund requires Hash review" : total !== Number(saved.reviewed_total_paise ?? saved.total_paise) ? "Order total changed; review required" : captured < total ? "Awaiting full payment capture" : null
     let paidAt = saved.paid_at
     if (!paidAt && captured >= total && total > 0) {
       const times = captures.map((p: any) => new Date(p.created_at).getTime()).filter(Number.isFinite)
@@ -71,7 +71,7 @@ export async function issueOtp(container: any, orderId: string, customerId: stri
   await reconcileOrder(container,orderId)
   return transaction(`order:${orderId}`, async c => {
     const { rows: [o] } = await c.query("SELECT * FROM hash_order WHERE order_id=$1 AND customer_id=$2",[orderId,customerId])
-    if (!o || !o.paid_at || o.hold_reason || o.reviewed_canceled || o.completed_at) fail("This order is not eligible for completion")
+    if (!o || o.cancellation_request || !o.paid_at || o.hold_reason || o.reviewed_canceled || o.completed_at) fail("This order is not eligible for completion")
     if (o.otp_locked_until && new Date(o.otp_locked_until).getTime() > Date.now()) fail("OTP locked. Try again after 15 minutes")
     if (o.otp_issued_at && Date.now()-new Date(o.otp_issued_at).getTime() < 60000) fail("Wait 60 seconds before requesting another code")
     const otp = newOtp(orderId), expires = new Date(Date.now()+10*60000)
@@ -89,7 +89,7 @@ export async function verifyOtp(container: any, a: any, orderId: string, code: s
     const { rows: [o] } = await c.query("SELECT * FROM hash_order WHERE order_id=$1",[orderId])
     own(a,o.vendor_id)
     if (o.completed_at) return { completed_at: o.completed_at }
-    if (o.hold_reason || o.reviewed_canceled || !o.paid_at) fail("Order payment must be captured and free of holds")
+    if (o.cancellation_request || o.hold_reason || o.reviewed_canceled || !o.paid_at) fail("Order payment must be captured and free of holds")
     if (!o.otp_hash || !o.otp_expires_at || new Date(o.otp_expires_at).getTime() < Date.now() || o.otp_attempts >= 5) fail("Code expired or locked; ask the customer to request another code")
     if (!matchesOtp(orderId,o.otp_nonce,code,o.otp_hash)) {
       await c.query(`UPDATE hash_order SET otp_attempts=otp_attempts+1,otp_locked_until=CASE WHEN otp_attempts>=4 THEN now()+interval '15 minutes' ELSE NULL END WHERE order_id=$1`,[orderId])
@@ -153,7 +153,7 @@ export async function reviewAdjustment(container: any,a: any,orderId: string,not
       await c.query("UPDATE hash_settlement SET amount_paise=$2 WHERE id=$1",[s.id,amount])
       remaining-=amount
     }
-    await c.query("UPDATE hash_order SET net_paise=$2,reviewed_refund_paise=refunded_paise,reviewed_canceled=$3,recovery_paise=$4,reviewed_total_paise=$5,hold_reason=NULL WHERE order_id=$1",[orderId,net,order.status==="canceled",Math.max(0,paid-net),minorUnits(order.total,order.currency_code)])
+    await c.query("UPDATE hash_order SET net_paise=$2,reviewed_refund_paise=refunded_paise,reviewed_canceled=$3,recovery_paise=$4,reviewed_total_paise=$5,hold_reason=CASE WHEN cancellation_request IS NOT NULL AND cancellation_request->>'status'<>'closed' AND NOT ($3 OR refunded_paise>=total_paise) THEN 'Customer cancellation requires review' ELSE NULL END WHERE order_id=$1",[orderId,net,order.status==="canceled",Math.max(0,paid-net),minorUnits(order.total,order.currency_code)])
     await applyShippingFee(c,orderId)
     await audit(c,a.id,"refund_settlement_adjusted",orderId,{note,net_paise:net,recovery_paise:Math.max(0,paid-net)})
     return {net_paise:net,recovery_paise:Math.max(0,paid-net)}

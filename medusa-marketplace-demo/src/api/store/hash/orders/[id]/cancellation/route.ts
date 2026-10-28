@@ -1,0 +1,2 @@
+import { cancellationReason,requestCancellation } from '../../../../../../lib/hash/cancellation'
+export async function POST(req:any,res:any){const reason=cancellationReason.safeParse(req.body?.reason);if(!reason.success)return res.status(400).json({message:'Provide a cancellation reason between 5 and 500 characters'});res.setHeader('Cache-Control','no-store');res.json({cancellation:await requestCancellation(req.params.id,reason.data,{customerId:req.auth_context.actor_id})})}

@@ -10,7 +10,7 @@ export function validatePickupDate(date:string,now=Date.now()){
 }
 export async function prepareDispatch(container:any,a:any,orderId:string,edits:any={}){
  const {rows:[o]}=await db().query('SELECT * FROM hash_order WHERE order_id=$1',[orderId]);if(!o)fail('Order not found');own(a,o.vendor_id)
- if(o.delivery_status!=='ready_to_ship'||o.completed_at||o.canceled_at||o.hold_reason||!o.paid_at)fail('Mark this paid order Ready to Ship first')
+ if(o.cancellation_request||o.delivery_status!=='ready_to_ship'||o.completed_at||o.canceled_at||o.hold_reason||!o.paid_at)fail('Mark this paid order Ready to Ship first')
  let {rows:[pickup]}=await db().query('SELECT * FROM hash_shipping_pickup WHERE vendor_id=$1',[o.vendor_id]);if(!pickup)fail('Set up the vendor pickup location once in Hash Operations')
  const {rows:[shipment]}=await db().query('SELECT * FROM hash_shipment WHERE order_id=$1',[orderId]);
  const {data:[order]}=await container.resolve('query').graph({entity:'order',fields:['id','display_id','total','items.product_id','items.quantity','shipping_address.*'],filters:{id:orderId}})
@@ -28,7 +28,7 @@ export async function prepareDispatch(container:any,a:any,orderId:string,edits:a
 export async function dispatchOrder(container:any,a:any,b:any){
  validatePickupDate(b.pickup_date)
  const {rows:[o]}=await db().query('SELECT * FROM hash_order WHERE order_id=$1',[b.order_id]);if(!o)fail('Order not found');own(a,o.vendor_id)
- if(o.delivery_status!=='ready_to_ship'||!o.paid_at||o.hold_reason||o.completed_at||o.canceled_at)fail('Order must be paid and Ready to Ship')
+ if(o.cancellation_request||o.delivery_status!=='ready_to_ship'||!o.paid_at||o.hold_reason||o.completed_at||o.canceled_at)fail('Order must be paid and Ready to Ship')
  let {rows:[s]}=await db().query('SELECT * FROM hash_shipment WHERE order_id=$1',[b.order_id]);if(!s)fail('Review the pickup before booking')
  if(s.status==='quoted'){
   if(s.revision!==b.revision)fail('Shipment changed; review it again')
@@ -42,6 +42,7 @@ export async function dispatchOrder(container:any,a:any,b:any){
  if(s.status!=='booked'||!s.waybill)fail('Booking is under review; refresh carrier tracking before retrying')
  const cfg=await delhiveryConfig()
  const decision=await transaction(`order:${b.order_id}`,async c=>{
+  const {rows:[order]}=await c.query('SELECT cancellation_request,hold_reason FROM hash_order WHERE order_id=$1 FOR UPDATE',[b.order_id]);if(order.cancellation_request||order.hold_reason)fail('Resolve the order hold before requesting pickup')
   const {rows:[current]}=await c.query('SELECT pickup_request_id FROM hash_shipment WHERE order_id=$1 FOR UPDATE',[b.order_id])
   if(current.pickup_request_id){const {rows:[r]}=await c.query('SELECT * FROM hash_pickup_request WHERE id=$1',[current.pickup_request_id]);return {existing:r}}
   const {rows:[claim]}=await c.query("INSERT INTO hash_pickup_request(location_name,pickup_date,status) VALUES($1,$2,'requesting') ON CONFLICT(location_name,pickup_date) DO NOTHING RETURNING *",[s.pickup.name,b.pickup_date])

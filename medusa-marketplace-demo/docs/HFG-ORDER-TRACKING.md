@@ -56,3 +56,10 @@ This is an address sticker, **not a purchased courier shipping label**. The vend
 ## Delhivery integration
 
 Orders booked through Hash Shipping now import Delhivery tracking approximately every 15 minutes. Manual tracking remains for other couriers; managed Delhivery orders use carrier refresh. Render `carrier_delivered` as "Courier reports delivered — awaiting OTP", `return_in_progress` as a return update, and `carrier_update` as a carrier update. These are timeline events; only successful customer OTP changes the final Hash status to delivered. See [Delhivery operations and fee guide](DELHIVERY.md). No courier API token or vendor shipping-charge controls belong in the customer app.
+
+## Customer cancellation requests
+Use `POST /store/hash/orders/:id/cancellation` with `{ "reason": "Customer cancellation reason" }`, the same customer bearer token, and storefront publishable-key header. The authenticated customer must own the order. Repeat requests return the existing request. Completed orders require a separate support/return process.
+
+Response: `{ "cancellation": { "status": "requested", "reason": "...", "requested_at": "...", "source": "customer" } }`. Poll `GET /store/hash/orders/:id` and read `tracking.cancellation`. States: `requested`, `submitting`, `review` (uncertain carrier response), `courier_requested` (carrier accepted), `not_booked` (no carrier shipment to cancel). This is not an automatic refund or Medusa order cancellation. Continue showing the order and tracking history. Do not display “refunded” based on these states.
+
+Show “Cancellation requested” immediately and disable repeat cancellation / OTP completion while the request exists. In-transit cancellation can result in return-to-origin; carrier charges may still apply. Hash reviews the refund separately. No changes to hfg-user-onboard authentication are required.

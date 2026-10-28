@@ -16,6 +16,7 @@ export default defineMiddlewares({routes:[
  }]},
  {matcher:"/auth/user/emailpass/register",method:"POST",middlewares:[(_req,res)=>res.status(403).json({message:"Hash provisions vendor accounts"})]},
  {matcher:"/store/hash/orders/:id",method:"GET",middlewares:[authenticate("customer",["session","bearer"])]},
+ {matcher:"/store/hash/orders/:id/cancellation",method:"POST",middlewares:[authenticate("customer",["session","bearer"])]},
  {matcher:"/store/hash/orders/:id/otp",method:"POST",middlewares:[authenticate("customer",["session","bearer"])]},
  {matcher:"/store/products*",method:"GET",middlewares:[async(req:any,res,next)=>{
   try {

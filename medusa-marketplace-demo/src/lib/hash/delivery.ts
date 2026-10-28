@@ -14,7 +14,7 @@ export const deliveryCommand = z.object({
 const productSteps=['placed','accepted','preparing','ready_to_ship','shipped','out_for_delivery','delivery_attempted']
 const serviceSteps=['placed','preparing','ready_for_service','in_progress']
 export function validateDeliveryTransition(o:any,next:string){
- if(o.completed_at||o.canceled_at||o.reviewed_canceled)fail('This order is already completed or canceled')
+ if(o.cancellation_request||o.completed_at||o.canceled_at||o.reviewed_canceled)fail('This order is already completed or canceled')
  if(!o.paid_at||o.hold_reason)fail('Resolve payment or order holds before updating delivery')
  const allowed=o.delivery_kind==='service'?serviceSteps:productSteps
  if(!allowed.includes(next))fail('This stage does not apply to this order')
@@ -34,7 +34,7 @@ export async function tracking(orderId:string,customerId?:string){
  if(o.completed_at)timeline.push({id:'completed',status:o.delivery_kind==='service'?'completed':'delivered',at:o.completed_at,note:'Completion confirmed with customer OTP'})
  if(o.canceled_at)timeline.push({id:'canceled',status:'canceled',at:o.canceled_at,note:'Order canceled'})
  timeline.sort((a,b)=>+new Date(a.at)-+new Date(b.at))
- return {delivery_address:shipment?.parcel?.delivery_address||null,order_id:orderId,kind:o.delivery_kind,status:o.canceled_at?'canceled':o.completed_at?(o.delivery_kind==='service'?'completed':'delivered'):o.delivery_status,revision:o.delivery_revision,paid:!!o.paid_at,on_hold:!!o.hold_reason,completion_eligible:!!o.paid_at&&!o.completed_at&&!o.hold_reason&&!o.canceled_at&&!o.reviewed_canceled,courier:o.delivery_details.courier||null,tracking_number:o.delivery_details.tracking_number||null,tracking_url:o.delivery_details.tracking_url||null,expected_delivery:o.delivery_details.expected_delivery||null,timeline}
+ return {cancellation:o.cancellation_request||null,delivery_address:shipment?.parcel?.delivery_address||null,order_id:orderId,kind:o.delivery_kind,status:o.canceled_at?'canceled':o.completed_at?(o.delivery_kind==='service'?'completed':'delivered'):o.delivery_status,revision:o.delivery_revision,paid:!!o.paid_at,on_hold:!!o.hold_reason,completion_eligible:!o.cancellation_request&&!!o.paid_at&&!o.completed_at&&!o.hold_reason&&!o.canceled_at&&!o.reviewed_canceled,courier:o.delivery_details.courier||null,tracking_number:o.delivery_details.tracking_number||null,tracking_url:o.delivery_details.tracking_url||null,expected_delivery:o.delivery_details.expected_delivery||null,timeline}
 }
 export async function updateDelivery(container:any,a:any,b:z.infer<typeof deliveryCommand>){
  const {rows:[owned]}=await db().query('SELECT vendor_id FROM hash_order WHERE order_id=$1',[b.order_id]);if(!owned)fail('Order not found');own(a,owned.vendor_id)

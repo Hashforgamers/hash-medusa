@@ -9,6 +9,9 @@ import { applyShippingFee } from './shipping-fees'
 const id=z.string().min(1).max(200)
 export const parcelSchema=z.object({weight_g:z.number().int().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150),mode:z.enum(['Surface','Express']),invoice:z.string().trim().min(1).max(50),ewaybill:z.string().regex(/^\d{12}$/).or(z.literal('')).default('')})
 export const shippingCommands=z.discriminatedUnion('action',[
+ z.object({action:z.literal('request_cancellation'),order_id:id,reason:z.string().trim().min(5).max(500)}),
+ z.object({action:z.literal('cancel_courier'),order_id:id,confirmed:z.literal(true)}),
+ z.object({action:z.literal('resolve_cancellation'),order_id:id,accepted:z.boolean(),note:z.string().trim().min(20).max(1000),confirmed:z.literal(true)}),
  z.object({action:z.literal('resolve_dispatch'),kind:z.enum(['location','pickup']),id,note:z.string().trim().min(20).max(1000),outcome:z.enum(['confirmed','absent']),carrier_id:z.string().regex(/^[1-9]\d*$/).optional(),confirmed:z.literal(true)}),
  z.object({action:z.literal('prepare_dispatch'),order_id:id,delivery_address:dispatchAddress.optional(),pickup_address:dispatchAddress.optional()}),
  z.object({action:z.literal('dispatch'),order_id:id,revision:z.number().int().positive(),pickup_date:z.string(),ewaybill:z.string().regex(/^\d{12}$/).or(z.literal('')).default(''),confirmed:z.literal(true)}),
@@ -40,7 +43,7 @@ export async function shippingOverview(a:any){
  return {reviews,shipments,pickups,settings:settings||{active:false,revision:0},fee_policy:'Actual invoiced charge, no markup; remaining order payouts held until reconciled'}
 }
 async function ownedOrder(a:any,id:string){const {rows:[o]}=await db().query('SELECT * FROM hash_order WHERE order_id=$1',[id]);if(!o)fail('Order not found');own(a,o.vendor_id);return o}
-function eligible(o:any){if(o.currency_code!=='inr'||o.delivery_kind!=='product'||!o.paid_at||o.hold_reason||o.canceled_at||o.completed_at||o.payment_mode!=='hash_collects')fail('Shipping requires a paid, unheld INR physical-product order collected by Hash')}
+function eligible(o:any){if(o.cancellation_request||o.currency_code!=='inr'||o.delivery_kind!=='product'||!o.paid_at||o.hold_reason||o.canceled_at||o.completed_at||o.payment_mode!=='hash_collects')fail('Shipping requires a paid, unheld INR physical-product order collected by Hash')}
 export function estimatePaise(body:any){const amount=Array.isArray(body)&&body.length===1?Number(body[0].total_amount):NaN;if(!Number.isFinite(amount)||amount<=0||amount>100000)throw Error('Delhivery did not return a valid shipping estimate');return Math.round(amount*100)}
 export function carrierStage(status:string,type:string){if(type==='DL'&&status==='Delivered')return 'carrier_delivered';if(type==='RT'||type==='RTO'||/RTO|Return/i.test(status))return 'return_in_progress';if(/Dispatched|Out for Delivery/i.test(status))return 'out_for_delivery';if(/In Transit|Picked Up/i.test(status))return 'shipped';return 'carrier_update'}
 export async function shippingAction(container:any,a:any,b:any){
@@ -97,9 +100,9 @@ export async function shippingAction(container:any,a:any,b:any){
  }
 }
 async function attachWaybill(orderId:string,waybill:string,actor:string){return transaction(`order:${orderId}`,async c=>{await c.query("UPDATE hash_shipment SET waybill=$2,status='booked',revision=revision+1 WHERE order_id=$1 AND status='booking'",[orderId,waybill]);await c.query("UPDATE hash_order SET delivery_details=delivery_details||$2::jsonb,delivery_revision=delivery_revision+1 WHERE order_id=$1",[orderId,JSON.stringify({courier:'Delhivery',tracking_number:waybill,tracking_url:'https://www.delhivery.com/track/package/'+waybill})]);await audit(c,actor,'shipment_booked',orderId,{waybill});return {ok:true}})}
-export async function syncShipment(orderId:string,token:string,actor='system'){
+export async function syncShipment(orderId:string,token:string,actor='system',force=false){
  const {rows:[s]}=await db().query('SELECT * FROM hash_shipment WHERE order_id=$1',[orderId]);if(!s||s.status==='quoted')fail('Book a shipment first')
- if(s.synced_at&&Date.now()-new Date(s.synced_at).getTime()<60000)return {message:'Tracking was refreshed recently'}
+ if(!force&&s.synced_at&&Date.now()-new Date(s.synced_at).getTime()<60000)return {message:'Tracking was refreshed recently'}
  const result=await delhiveryRequest(token,'/api/v1/packages/json/?'+new URLSearchParams(s.waybill?{waybill:s.waybill}:{ref_ids:orderId}))
  const shipments=result.ShipmentData?.map((x:any)=>x.Shipment)||[];const shipment=shipments.find((x:any)=>x.ReferenceNo===orderId&&(!s.waybill||String(x.AWB)===s.waybill));if(!shipment)fail('Delhivery has not confirmed this shipment yet; check the order reference in Delhivery One')
  if(!s.waybill){if(!/^\d{8,20}$/.test(String(shipment.AWB)))fail('Invalid carrier waybill');await attachWaybill(orderId,String(shipment.AWB),actor)}
