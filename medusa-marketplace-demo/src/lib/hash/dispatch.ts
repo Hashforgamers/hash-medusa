@@ -3,7 +3,7 @@ import { dispatchAddress } from './shipping-address'
 import { db,transaction,audit } from './db'
 import { own,fail,requireHash } from './access'
 import { packedEstimate } from './checkout-shipping'
-import { shippingAction,delhiveryConfig,delhiveryRequest } from './delhivery'
+import { shippingAction,delhiveryConfig,delhiveryRequest,parcelSchema } from './delhivery'
 export function validatePickupDate(date:string,now=Date.now()){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)fail('Choose a valid pickup date')
  const at=Date.parse(date+'T14:00:00+05:30');if(at<now+60*60000||at>now+30*86400000)fail('Choose a pickup date with at least one hour notice and within 30 days')
@@ -21,7 +21,10 @@ export async function prepareDispatch(container:any,a:any,orderId:string,edits:a
  const pickup_suggestion={first_name:business.contact_name||'',address_1:business.address_line1||'',address_2:business.address_line2||'',city:business.city||'',province:business.state||'',postal_code:business.postal_code||pickup.pincode,phone:business.phone||''}
  const delivery=edits.delivery_address?dispatchAddress.parse(edits.delivery_address):order.shipping_address
  if(edits.pickup_address){const address=dispatchAddress.parse(edits.pickup_address);pickup={name:'HASH-'+createHash('sha256').update(JSON.stringify([o.vendor_id,address])).digest('hex').slice(0,24),pincode:address.postal_code,address,vendor_id:o.vendor_id}}
- const parcel={...packedEstimate(order.items,listings),mode:'Surface',invoice:String(order.display_id||orderId),ewaybill:''}
+ let measurements:any
+ if(edits.packed_parcel)measurements=parcelSchema.pick({weight_g:true,length_cm:true,width_cm:true,height_cm:true}).parse(edits.packed_parcel)
+ else{try{measurements=packedEstimate(order.items,listings)}catch{return {order_id:orderId,requires_packed_parcel:true,message:'Enter the actual weight and outer dimensions of this complete packed order. Listing package details are missing or exceed the supported parcel size.'}}}
+ const parcel={...measurements,mode:'Surface',invoice:String(order.display_id||orderId),ewaybill:''}
  const quote=await shippingAction(container,a,{action:'quote',order_id:orderId,parcel,delivery_address:delivery,pickup_override:pickup})
  return {order_id:orderId,pickup,shipment:quote,pickup_suggestion,delivery_address:delivery,needs_ewaybill:Number(order.total)>=50000}
 }

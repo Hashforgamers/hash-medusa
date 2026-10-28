@@ -49,6 +49,11 @@ const container={resolve:name=>({graph:async({filters})=>({data:filters.customer
   await assert.rejects(()=>shippingAction(container,{...actor,vendor_id:'other'},{action:'book',order_id:key,revision:quote.revision,confirmed:true}));assert.equal(manifests,0);
   await db().query("UPDATE hash_order SET delivery_status='ready_to_ship' WHERE order_id=$1",[key]);
   const address={first_name:'Sample',last_name:'Customer',address_1:'Edited delivery address',address_2:'',city:'Bengaluru',province:'Karnataka',postal_code:'560001',country_code:'in',phone:'9000000000'};
+  await db().query('UPDATE hash_listing SET shipping_package=NULL WHERE product_id=$1',[product]);
+  assert.equal((await prepareDispatch(container,actor,key)).requires_packed_parcel,true);
+  await assert.rejects(()=>prepareDispatch(container,actor,key,{packed_parcel:{weight_g:0,length_cm:20,width_cm:10,height_cm:5}}));
+  const fallback=await prepareDispatch(container,actor,key,{packed_parcel:{weight_g:500,length_cm:20,width_cm:10,height_cm:5}});assert.equal(fallback.shipment.parcel.weight_g,500);
+  await db().query('UPDATE hash_listing SET shipping_package=$2 WHERE product_id=$1',[product,{weight_g:500,length_cm:20,width_cm:10,height_cm:5}]);
   const prepared=await prepareDispatch(container,actor,key,{delivery_address:address,pickup_address:{...address,address_1:'Edited pickup address',postal_code:'560002'}});
   const command={order_id:key,revision:prepared.shipment.revision,pickup_date:new Date(Date.now()+86400000).toISOString().slice(0,10),confirmed:true};
   await assert.rejects(()=>dispatchOrder(container,{...actor,vendor_id:'other'},command));

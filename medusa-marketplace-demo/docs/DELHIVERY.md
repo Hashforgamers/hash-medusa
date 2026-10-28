@@ -69,3 +69,6 @@ No shipment booked: dispatch remains stopped and Operations reviews the order/re
 Admin shipping actions: `request_cancellation` (`order_id`, `reason`); `cancel_courier` (`order_id`, `confirmed:true`); super-admin `resolve_cancellation` (`order_id`, `accepted`, evidence `note`, `confirmed:true`). Authentication and vendor ownership are enforced server-side.
 
 Contract: https://one.delhivery.com/developer-portal/document/b2c/detail/order-cancellation
+
+### Missing unit measurements at dispatch
+Book Delhivery pickup now asks for the actual complete parcel weight (grams, up to 30000) and outer length/width/height (cm, each up to 150) when listing measurements are missing or the computed parcel exceeds limits. This shipment-only override does not change listing approval, unit defaults, paid checkout totals, or customer delivery charges. Save unit defaults through Listings → Edit for future customer-paid checkout quotes. `prepare_dispatch` accepts optional `packed_parcel: {weight_g,length_cm,width_cm,height_cm}` and otherwise returns `requires_packed_parcel:true` when measurements are needed.

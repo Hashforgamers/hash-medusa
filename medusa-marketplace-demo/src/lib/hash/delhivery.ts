@@ -13,7 +13,7 @@ export const shippingCommands=z.discriminatedUnion('action',[
  z.object({action:z.literal('cancel_courier'),order_id:id,confirmed:z.literal(true)}),
  z.object({action:z.literal('resolve_cancellation'),order_id:id,accepted:z.boolean(),note:z.string().trim().min(20).max(1000),confirmed:z.literal(true)}),
  z.object({action:z.literal('resolve_dispatch'),kind:z.enum(['location','pickup']),id,note:z.string().trim().min(20).max(1000),outcome:z.enum(['confirmed','absent']),carrier_id:z.string().regex(/^[1-9]\d*$/).optional(),confirmed:z.literal(true)}),
- z.object({action:z.literal('prepare_dispatch'),order_id:id,delivery_address:dispatchAddress.optional(),pickup_address:dispatchAddress.optional()}),
+ z.object({action:z.literal('prepare_dispatch'),order_id:id,delivery_address:dispatchAddress.optional(),pickup_address:dispatchAddress.optional(),packed_parcel:parcelSchema.pick({weight_g:true,length_cm:true,width_cm:true,height_cm:true}).optional()}),
  z.object({action:z.literal('dispatch'),order_id:id,revision:z.number().int().positive(),pickup_date:z.string(),ewaybill:z.string().regex(/^\d{12}$/).or(z.literal('')).default(''),confirmed:z.literal(true)}),
  z.object({action:z.literal('payer'),vendor_id:id,payer:z.enum(['seller','customer']),revision:z.number().int().positive()}),
  z.object({action:z.literal('settings'),token:z.string().trim().min(16).max(1000),revision:z.number().int().nonnegative()}),
