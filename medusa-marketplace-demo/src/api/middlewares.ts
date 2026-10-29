@@ -12,7 +12,7 @@ export default defineMiddlewares({routes:[
  {matcher:"/admin/*",middlewares:[authenticate("user",["session","bearer"]),async(req:any,res,next)=>{
   try { const a=await actor(req)
    const path=req.originalUrl.split("?")[0].replace(/\/$/,"")
-   if(!a.superAdmin && path!=="/admin/hash" && path!=="/admin/hash/images" && path!=="/admin/hash/shipping" && !(path==="/admin/hash/reviews" && req.method==="GET") && !(path==="/admin/users/me" && req.method==="GET")) fail("Use the Hash vendor portal for your business")
+   if(!a.superAdmin && path!=="/admin/hash" && path!=="/admin/hash/images" && path!=="/admin/hash/shipping" && !(path==="/admin/hash/promotions" && ["GET","POST"].includes(req.method)) && !(path==="/admin/hash/reviews" && req.method==="GET") && !(path==="/admin/users/me" && req.method==="GET")) fail("Use the Hash vendor portal for your business")
    next()
   }catch(e){next(e)}
  }]},

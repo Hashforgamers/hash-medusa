@@ -6,7 +6,7 @@ Backend: `https://hash-medusa.onrender.com`.
 
 Hash super admins: open **Promotions** in the partner portal. Create a draft, review its value and eligible listings, then **Activate**. Available controls: percentage or fixed amount off merchandise, coupon or automatic application, cart currency, selected listings (empty means all), optional start/end dates and a global redemption limit. Input dates use the operator's device timezone and are sent as UTC. The table displays dates in the configured store timezone.
 
-To change offer terms, deactivate the old offer and create a new code. No offer is enabled merely by deploying this feature. Vendors cannot create or activate these offers. Review the commercial impact: discounts reduce the order value used for vendor earnings and commission. Delivery charges are not discounted by these controls. Existing completed orders are unchanged. Multiple eligible promotions can combine; this version has no exclusive-code setting or per-customer usage limit.
+To change offer terms, deactivate the old offer and create a new code. No offer is enabled merely by deploying this feature. Vendors can create, activate and deactivate their own offers in **Partner Console → Promotions**. Their offers are scoped server-side to their own listings. Leaving the listing selection empty includes all their current listings (up to 500); newly added listings are not added retroactively. Vendors cannot view or modify other vendors’ or Hash’s offers. Hash super admins can view and deactivate all offers. Coupon codes must be unique across the store; use a vendor-specific prefix. Review the commercial impact: discounts reduce the order value used for vendor earnings and commission. Delivery charges are not discounted by these controls. Existing completed orders are unchanged. Multiple eligible promotions can combine; this version has no exclusive-code setting or per-customer usage limit.
 
 ## Customer identity and headers
 
@@ -57,10 +57,10 @@ Medusa amounts are major currency units (e.g. `25.5` means ₹25.50); Razorpay's
 
 The backend is ready independently of an app release. Coupon entry/removal UI must be shipped by the app team. Automatic discounts are reflected by Medusa's cart calculations; the app still needs to display those totals correctly.
 
-## Operations API (super-admin only)
+## Operations API (Hash and authenticated vendors)
 
-- `GET /admin/hash/promotions?offset=0`: `{promotions,count,offset,limit}` (100 per page).
-- `POST /admin/hash/promotions`: create draft:
+- `GET /admin/hash/promotions?offset=0`: `{promotions,count,offset,limit}` (100 per page). Vendors receive only their owned offers. `vendor_id: null` identifies a Hash store offer.
+- `POST /admin/hash/promotions`: create draft; vendor ownership comes from the authenticated account, never a client-supplied vendor ID:
 
 ```json
 {"action":"create","definition":{"code":"SAVE10","discount_type":"percentage","value":10,"currency_code":"inr","automatic":false,"product_ids":[],"starts_at":null,"ends_at":null,"usage_limit":100}}

@@ -169,6 +169,11 @@ export async function migrate() {
     id bigserial PRIMARY KEY, actor text NOT NULL, action text NOT NULL, entity_id text NOT NULL,
     detail jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
   );
+  CREATE TABLE IF NOT EXISTS hash_promotion_owner (
+    promotion_id text PRIMARY KEY, vendor_id text NOT NULL REFERENCES hash_vendor(id),
+    created_by text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS hash_promotion_vendor ON hash_promotion_owner(vendor_id);
   CREATE TABLE IF NOT EXISTS hash_product_review (
     id text PRIMARY KEY, product_id text NOT NULL REFERENCES hash_listing(product_id),
     customer_id text NOT NULL, order_id text NOT NULL REFERENCES hash_order(order_id),
