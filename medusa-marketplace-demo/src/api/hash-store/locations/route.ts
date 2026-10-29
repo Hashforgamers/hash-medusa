@@ -1,5 +1,6 @@
 import { addressCountries, addressStates } from '../../../lib/hash/geography'
 export async function GET(req:any,res:any){
+ res.setHeader('Access-Control-Allow-Origin','*')
  res.setHeader('Cache-Control','public, max-age=86400')
  const country=req.query.country_code
  if(country===undefined)return res.json({countries:addressCountries()})

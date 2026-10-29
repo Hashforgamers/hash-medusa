@@ -33,3 +33,11 @@ test('dispatch rejects foreign states before a courier request',()=>{
  expect(dispatchAddress.safeParse(a).success).toBe(false)
  expect(dispatchAddress.parse({...a,province:'MH'}).province).toBe('Maharashtra')
 })
+
+import { GET as locations } from '../../../api/hash-store/locations/route'
+test('public location bootstrap supports the separately hosted partner portal',async()=>{
+ const res={setHeader:jest.fn(),json:jest.fn(),status:jest.fn().mockReturnThis()}
+ await locations({query:{country_code:'in'}},res)
+ expect(res.setHeader).toHaveBeenCalledWith('Access-Control-Allow-Origin','*')
+ expect(res.json.mock.calls[0][0].states).toHaveLength(36)
+})
