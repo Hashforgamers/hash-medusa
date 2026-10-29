@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const promotionDefinition = z.object({
- code:z.string().trim().toUpperCase().regex(/^[A-Z0-9][A-Z0-9_-]{2,49}$/, 'Use 3–50 letters, numbers, underscores or hyphens'),
+ code:z.string().trim().transform(s=>s.toUpperCase().replace(/\s+/g,'-')).pipe(z.string().regex(/^[A-Z0-9][A-Z0-9_-]{2,49}$/, 'Use 3–50 letters, numbers, underscores or hyphens')),
  discount_type:z.enum(['percentage','fixed']),
  value:z.number().positive().max(1000000),
  currency_code:z.string().regex(/^[a-z]{3}$/),
