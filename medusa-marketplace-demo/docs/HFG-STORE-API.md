@@ -155,3 +155,7 @@ TypeScript and Medusa production build passed. Twelve upload/identity/access tes
 ## Configurable finance extension
 
 See [Hash finance guide](HASH-FINANCE.md) for editable settlement plans, payout connectors, Razorpay customer plans and the subscription API. The fixed 50/50 wording above describes the seeded legacy plan only; new orders use their assigned plan snapshot. Customer recurring plans are standalone billing agreements, not instalment checkout for Medusa carts.
+
+## Cart discounts and promotions
+
+See [HFG-PROMOTIONS.md](./HFG-PROMOTIONS.md) for coupon apply/remove APIs, automatic discounts, server totals and Razorpay session refresh requirements. Hash super admins manage offers in **Promotions**.
