@@ -169,6 +169,18 @@ export async function migrate() {
     id bigserial PRIMARY KEY, actor text NOT NULL, action text NOT NULL, entity_id text NOT NULL,
     detail jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
   );
+  CREATE TABLE IF NOT EXISTS hash_product_review (
+    id text PRIMARY KEY, product_id text NOT NULL REFERENCES hash_listing(product_id),
+    customer_id text NOT NULL, order_id text NOT NULL REFERENCES hash_order(order_id),
+    rating integer NOT NULL CHECK(rating BETWEEN 1 AND 5), title text NOT NULL DEFAULT '', body text NOT NULL,
+    status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','withdrawn')),
+    revision integer NOT NULL DEFAULT 1, moderation_note text NOT NULL DEFAULT '', moderated_by text, moderated_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(product_id,customer_id)
+  );
+  CREATE INDEX IF NOT EXISTS hash_review_product_status ON hash_product_review(product_id,status,created_at DESC);
+  CREATE INDEX IF NOT EXISTS hash_review_customer ON hash_product_review(customer_id);
+  CREATE INDEX IF NOT EXISTS hash_review_moderation ON hash_product_review(status,updated_at DESC);
   CREATE INDEX IF NOT EXISTS hash_listing_vendor ON hash_listing(vendor_id);
   CREATE INDEX IF NOT EXISTS hash_order_vendor ON hash_order(vendor_id);
   CREATE INDEX IF NOT EXISTS hash_settlement_due ON hash_settlement(status,due_at);

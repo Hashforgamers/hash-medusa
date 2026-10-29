@@ -159,3 +159,7 @@ See [Hash finance guide](HASH-FINANCE.md) for editable settlement plans, payout 
 ## Cart discounts and promotions
 
 See [HFG-PROMOTIONS.md](./HFG-PROMOTIONS.md) for coupon apply/remove APIs, automatic discounts, server totals and Razorpay session refresh requirements. Hash super admins manage offers in **Promotions**.
+
+## Customer product reviews
+
+See [HFG-PRODUCT-REVIEWS.md](./HFG-PRODUCT-REVIEWS.md) for verified-purchase eligibility, customer submit/edit/withdraw, public ratings, and moderation. Product cards now include `rating_summary`.

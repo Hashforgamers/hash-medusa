@@ -2,6 +2,8 @@ import { defineMiddlewares, authenticate } from "@medusajs/framework/http"
 import { actor, fail } from "../lib/hash/access"
 import { db } from "../lib/hash/db"
 export default defineMiddlewares({routes:[
+ {matcher:"/store/hash/reviews*",middlewares:[authenticate("customer",["session","bearer"])]},
+ {matcher:"/store/hash/reviews",method:"POST",bodyParser:{sizeLimit:"16kb"}},
  {matcher:"/store/hash/carts/:id/delivery",method:"GET",middlewares:[authenticate("customer",["session","bearer"])]},
  {matcher:"/hash-webhooks/razorpay/:mode",method:"POST",bodyParser:{preserveRawBody:true,sizeLimit:"256kb"}},
  {matcher:"/store/hash/subscriptions*",middlewares:[authenticate("customer",["session","bearer"])]},
@@ -10,7 +12,7 @@ export default defineMiddlewares({routes:[
  {matcher:"/admin/*",middlewares:[authenticate("user",["session","bearer"]),async(req:any,res,next)=>{
   try { const a=await actor(req)
    const path=req.originalUrl.split("?")[0].replace(/\/$/,"")
-   if(!a.superAdmin && path!=="/admin/hash" && path!=="/admin/hash/images" && path!=="/admin/hash/shipping" && !(path==="/admin/users/me" && req.method==="GET")) fail("Use the Hash vendor portal for your business")
+   if(!a.superAdmin && path!=="/admin/hash" && path!=="/admin/hash/images" && path!=="/admin/hash/shipping" && !(path==="/admin/hash/reviews" && req.method==="GET") && !(path==="/admin/users/me" && req.method==="GET")) fail("Use the Hash vendor portal for your business")
    next()
   }catch(e){next(e)}
  }]},

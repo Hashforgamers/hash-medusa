@@ -1,0 +1,68 @@
+// Real local HTTP workflows only. No hosted database or external payment calls.
+const assert=require('node:assert/strict');require('dotenv').config({quiet:true});
+const {Pool}=require('pg'),db=new Pool({connectionString:'postgres://marketplace:super-secure-password@127.0.0.1:5433/marketplace'});
+const base='http://localhost:9000',suffix=Date.now();let admin,key,product,review;
+const jwt=(actor_id,actor_type='user')=>require('jsonwebtoken').sign({actor_id,actor_type,auth_identity_id:'local-review-check'},process.env.JWT_SECRET||'supersecret',{expiresIn:'1h'});
+async function req(path,method='GET',body,token=admin,expected=200){const r=await fetch(base+path,{method,headers:{'content-type':'application/json',...(key?{'x-publishable-api-key':key}:{}),...(token?{authorization:'Bearer '+token}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});const d=await r.json();assert.equal(r.status,expected,`${method} ${path}: ${JSON.stringify(d)}`);return d}
+(async()=>{try{
+ const {rows:[u]}=await db.query(`SELECT id FROM "user" WHERE metadata->>'is_super_admin'='true' AND deleted_at IS NULL LIMIT 1`);assert(u);admin=jwt(u.id);
+ key=(await req('/hash-store/config')).publishable_api_key;
+ await req('/store/hash/reviews','GET',undefined,null,401);
+ const data=await req('/admin/hash'),vendor=data.vendors.find(v=>v.status==='active'&&v.payment_mode==='hash_collects');assert(vendor);
+ product=(await req('/admin/hash','POST',{action:'save_product',vendor_id:vendor.id,title:'Review QA '+suffix,kind:'service',price_inr:100,stock:10})).result;
+ await req('/admin/hash','POST',{action:'review_product',product_id:product.product_id,approval:'approved'});
+ const listing=(await req('/admin/hash')).products.find(p=>p.product_id===product.product_id);
+ const {rows:[member]}=await db.query(`SELECT m.user_id FROM hash_member m JOIN "user" u ON u.id=m.user_id WHERE m.vendor_id=$1 AND u.deleted_at IS NULL LIMIT 1`,[vendor.id]);assert(member);const vendorToken=jwt(member.user_id);
+ let {rows:[otherMember]}=await db.query(`SELECT m.user_id FROM hash_member m JOIN hash_vendor v ON v.id=m.vendor_id JOIN "user" u ON u.id=m.user_id WHERE m.vendor_id<>$1 AND v.status='active' AND u.deleted_at IS NULL LIMIT 1`,[vendor.id]);
+ if(!otherMember){const otherEmail='other-review-vendor-'+suffix+'@example.test';const other=(await req('/admin/hash','POST',{action:'onboard',name:'Review QA other '+suffix,email:otherEmail})).result;otherMember=(await db.query('SELECT user_id FROM hash_member WHERE vendor_id=$1',[other.vendor_id])).rows[0];assert(otherMember)}
+ const email='review-'+suffix+'@example.test',password='Local-Review-Customer-123!';let customer=(await req('/auth/customer/emailpass/register','POST',{email,password},null)).token;
+ await req('/store/customers','POST',{email,first_name:'PRIVATE NAME'},customer);customer=(await req('/auth/customer/emailpass','POST',{email,password},null)).token;
+ const region=(await req('/store/regions')).regions.find(r=>r.currency_code==='inr');
+ const cart=(await req('/store/carts','POST',{region_id:region.id,items:[{variant_id:listing.variant_id,quantity:1}],email,shipping_address:{first_name:'Test',last_name:'Customer',address_1:'1 Test Street',city:'Bengaluru',country_code:'in',postal_code:'560001',phone:'9000000000'}},customer)).cart;
+ const options=(await req('/store/shipping-options?cart_id='+cart.id,'GET',undefined,customer)).shipping_options;
+ const option=options.find(x=>x.provider_id==='hash_delivery_hash_delivery')||options[0];assert(option);
+ await req(`/store/carts/${cart.id}/shipping-methods`,'POST',{option_id:option.id},customer);
+ const collection=(await req('/store/payment-collections','POST',{cart_id:cart.id},customer)).payment_collection;
+ await req(`/store/payment-collections/${collection.id}/payment-sessions`,'POST',{provider_id:'pp_system_default'},customer);
+ const completed=await req(`/store/carts/${cart.id}/complete`,'POST',{},customer);assert.equal(completed.type,'order');const order=completed.order;
+ const eligibility='/store/hash/reviews/eligibility?order_id='+order.id+'&product_id='+product.product_id;
+ assert.equal((await req(eligibility,'GET',undefined,customer)).eligible,false);
+ const payload={product_id:product.product_id,order_id:order.id,rating:1,title:'Needs improvement',body:'The service could be improved. Honest customer feedback.'};
+ await req('/store/hash/reviews','POST',payload,customer,400);
+ const adminOrder=(await req('/admin/orders/'+order.id+'?fields=*payment_collections.payments')).order;
+ await req('/admin/payments/'+adminOrder.payment_collections[0].payments[0].id+'/capture','POST',{});
+ await req('/admin/hash','POST',{action:'reconcile'});
+ assert.equal((await req(eligibility,'GET',undefined,customer)).eligible,false);
+ const otp=await req('/store/hash/orders/'+order.id+'/otp','POST',{},customer);
+ await req('/admin/hash','POST',{action:'verify_otp',order_id:order.id,code:otp.code});
+ assert.equal((await req(eligibility,'GET',undefined,customer)).eligible,true);
+ const stranger=jwt('cus_not_this_customer','customer');await req(eligibility,'GET',undefined,stranger,404);
+ await req('/store/hash/reviews','POST',payload,stranger,404);
+ await req('/store/hash/reviews','POST',{...payload,product_id:data.products.find(x=>x.product_id!==product.product_id).product_id},customer,400);
+ review=(await req('/store/hash/reviews','POST',payload,customer)).review;assert.equal(review.status,'pending');
+ await req('/store/hash/reviews','POST',payload,customer,409);
+ const publicPath='/store/hash/products/'+product.product_id+'/reviews';assert.equal((await req(publicPath,'GET',undefined,null)).count,0);
+ const pub=()=>req(publicPath,'GET',undefined,null);
+ await req('/admin/hash/reviews','POST',{id:review.id,revision:review.revision,status:'approved'},vendorToken,400);
+ assert(!(await req('/admin/hash/reviews?status=all','GET',undefined,vendorToken)).reviews.some(r=>r.id===review.id));
+ let mod=(await req('/admin/hash/reviews','POST',{id:review.id,revision:review.revision,status:'approved'})).review;
+ let visible=await pub();assert.equal(visible.count,1);assert.equal(visible.rating_summary.average,1);assert.equal(visible.rating_summary.breakdown[1],1);
+ const text=JSON.stringify(visible);for(const secret of ['customer_id','order_id','PRIVATE NAME',email,'moderation_note'])assert(!text.includes(secret));
+ const vendorView=(await req('/admin/hash/reviews?status=all','GET',undefined,vendorToken)).reviews.find(r=>r.id===review.id);assert(vendorView);assert(!('order_id' in vendorView));
+ assert(!(await req('/admin/hash/reviews?status=all','GET',undefined,jwt(otherMember.user_id))).reviews.some(r=>r.id===review.id));
+ const catalog=(await req('/store/hash/products?limit=100','GET',undefined,null)).products.find(p=>p.product_id===product.product_id);assert.equal(catalog.rating_summary.average,1);
+ assert.equal((await req('/store/hash/reviews','GET',undefined,stranger)).count,0);
+ await req('/store/hash/reviews/'+review.id,'DELETE',{revision:mod.revision},stranger,404);
+ review=(await req('/store/hash/reviews','POST',{...payload,rating:2,revision:mod.revision},customer)).review;assert.equal(review.status,'pending');assert.equal((await pub()).count,0);
+ await req('/admin/hash/reviews','POST',{id:review.id,revision:mod.revision,status:'approved'},admin,409);
+ mod=(await req('/admin/hash/reviews','POST',{id:review.id,revision:review.revision,status:'rejected',note:'Local QA moderation example'})).review;
+ const own=(await req('/store/hash/reviews?product_id='+product.product_id,'GET',undefined,customer)).reviews[0];assert.equal(own.moderation_note,'Local QA moderation example');
+ review=(await req('/store/hash/reviews','POST',{...payload,revision:mod.revision},customer)).review;
+ mod=(await req('/admin/hash/reviews','POST',{id:review.id,revision:review.revision,status:'approved'})).review;
+ review=(await req('/store/hash/reviews/'+review.id,'DELETE',{revision:mod.revision},customer)).review;assert.equal(review.status,'withdrawn');assert.equal((await pub()).count,0);
+ await req('/admin/hash/reviews','POST',{id:review.id,revision:review.revision,status:'approved'},admin,400);
+ await req('/admin/hash','POST',{action:'review_product',product_id:product.product_id,approval:'rejected',review_note:'Local review test complete'});
+ await req(publicPath,'GET',undefined,null,404);
+ console.log('PASS paid + OTP purchase eligibility, customer/vendor isolation, pending visibility, moderation, negative rating, aggregates, stale revision rejection, edit re-moderation, withdrawal and hidden-product protection.');
+ }finally{await db.end()}
+})().catch(e=>{console.error(e.message);process.exitCode=1});
