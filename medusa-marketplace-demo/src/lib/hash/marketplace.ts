@@ -1,3 +1,4 @@
+import { validateCategoryIds } from './categories'
 import { randomUUID, randomBytes } from "crypto"
 import { Modules } from "@medusajs/framework/utils"
 import { createProductsWorkflow, updateProductsWorkflow, updateProductVariantsWorkflow } from "@medusajs/medusa/core-flows"
@@ -50,6 +51,7 @@ export async function addMember(container: any,a: any,b: any) {
 }
 export async function saveProduct(container: any,a: any,b: any) {
   own(a,b.vendor_id)
+  const category_ids=b.category_ids===undefined?undefined:await validateCategoryIds(container,b.category_ids)
   const { rows:[vendor] } = await db().query("SELECT * FROM hash_vendor WHERE id=$1",[b.vendor_id])
   if (!vendor || vendor.status !== "active") fail("Vendor is not active")
   const [configuredStore] = await container.resolve(Modules.STORE).listStores({}, {relations:["supported_currencies"]})
@@ -72,12 +74,12 @@ export async function saveProduct(container: any,a: any,b: any) {
       // Unpublish before editing. A failed edit stays safely unpublished and pending.
       await container.resolve(Modules.PRODUCT).updateProducts(productId,{status:"draft"})
       await c.query("UPDATE hash_listing SET approval='pending',review_note='',updated_at=now() WHERE product_id=$1",[productId])
-      await updateProductsWorkflow(container).run({input:{selector:{id:productId},update:{title:b.title,description:b.description,thumbnail:b.thumbnail || null,status:"draft"}}})
+      await updateProductsWorkflow(container).run({input:{selector:{id:productId},update:{...(category_ids!==undefined?{category_ids}:{}),title:b.title,description:b.description,thumbnail:b.thumbnail || null,status:"draft"}}})
       const {data:[p]} = await container.resolve("query").graph({entity:"product",fields:["id","variants.id"],filters:{id:productId}})
       await updateProductVariantsWorkflow(container).run({input:{product_variants:[{id:p.variants[0].id,prices}]}})
     } else {
       const {result} = await createProductsWorkflow(container).run({input:{products:[{
-        title:b.title,description:b.description,thumbnail:b.thumbnail || undefined,status:"draft",shipping_profile_id:profile.id,
+        category_ids:category_ids||[],title:b.title,description:b.description,thumbnail:b.thumbnail || undefined,status:"draft",shipping_profile_id:profile.id,
         handle:`${b.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,60)}-${randomBytes(4).toString("hex")}`,
         options:[{title:"Option",values:["Standard"]}],sales_channels:[{id:store.default_sales_channel_id}],
         variants:[{title:"Standard",options:{Option:"Standard"},manage_inventory:true,allow_backorder:false,prices}]
@@ -121,12 +123,12 @@ export async function catalog(container: any, vendorId?: string, publicOnly=fals
   const {rows} = await db().query(`SELECT l.*,v.name AS vendor_name FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id
     WHERE ($1::text IS NULL OR l.vendor_id=$1) AND (NOT $2 OR (l.approval='approved' AND v.status='active')) ORDER BY l.updated_at DESC`,[vendorId || null,publicOnly])
   if (!rows.length) return []
-  const {data} = await container.resolve("query").graph({entity:"product",fields:["id","title","description","thumbnail","status","variants.id","variants.prices.*","variants.inventory_items.inventory.location_levels.*"],filters:{id:rows.map(r=>r.product_id)}})
+  const {data} = await container.resolve("query").graph({entity:"product",fields:["id","title","description","thumbnail","status","categories.id","categories.name","categories.handle","categories.is_active","categories.is_internal","variants.id","variants.prices.*","variants.inventory_items.inventory.location_levels.*"],filters:{id:rows.map(r=>r.product_id)}})
   return rows.flatMap(r => {
     const p = data.find((p: any)=>p.id===r.product_id)
     if (!p || (publicOnly && p.status !== "published")) return []
     const variant = p.variants[0],levels = variant?.inventory_items?.flatMap((i: any)=>i.inventory?.location_levels || []) || []
-    return [{...r,title:p.title,description:p.description,thumbnail:p.thumbnail,status:p.status,variant_id:variant?.id,
+    return [{...r,categories:(p.categories||[]).filter(c=>c.is_active&&!c.is_internal).map(({id,name,handle})=>({id,name,handle})),title:p.title,description:p.description,thumbnail:p.thumbnail,status:p.status,variant_id:variant?.id,
       prices:(variant?.prices||[]).filter((p:any)=>!p.price_list_id&&!p.min_quantity&&!p.max_quantity).map((p:any)=>({currency_code:p.currency_code,amount:p.amount})),
       price_inr:variant?.prices?.find((p:any)=>p.currency_code==="inr")?.amount,
       stock:levels.reduce((n:number,l:any)=>n+Number(l.stocked_quantity || 0),0),

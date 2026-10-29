@@ -1,9 +1,10 @@
+import { normalizeState } from './geography'
 import { z } from "zod"
 const text = (max=200) => z.string().trim().max(max).default("")
 export const businessSchema = z.object({
  legal_name:text(),contact_name:text(),phone:text(40),support_email:z.union([z.string().email(),z.literal("")]).default(""),
  tax_id:text(80),registration_id:text(80),address_line1:text(),address_line2:text(),city:text(100),state:text(100),postal_code:text(30),country_code:z.string().regex(/^[a-z]{2}$/).default("in"),
-})
+}).transform((b,ctx)=>{try{return {...b,state:b.state?normalizeState(b.country_code,b.state):''}}catch(e){ctx.addIssue({code:'custom',path:['state'],message:e.message});return z.NEVER}})
 export const bankSchema = z.object({
  account_holder:z.string().trim().min(2).max(150),bank_name:z.string().trim().min(2).max(150),branch:text(150),
  account_number:z.string().trim().regex(/^[A-Za-z0-9]{4,34}$/),account_number_confirmation:z.string(),

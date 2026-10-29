@@ -1,3 +1,4 @@
+import { categories } from '../../../lib/hash/categories'
 import { deliveryCommand, updateDelivery, tracking, shippingLabel } from '../../../lib/hash/delivery'
 import { readPlans, selectedPlan, planSummary } from "../../../lib/hash/settlement-plans"
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
@@ -14,7 +15,7 @@ const commands = z.discriminatedUnion("action",[
  z.object({action:z.literal("shipping_label"),order_id:id}),
  z.object({action:z.literal("onboard"),name:z.string().min(2).max(150),email:z.string().email().transform(s=>s.toLowerCase()),commission_bps:z.number().int().min(0).max(10000).default(0),payment_mode:z.enum(["hash_collects","vendor_direct"]).default("hash_collects"),payout_details:z.string().max(2000).default(""),business_details:businessSchema.optional(),bank_details:bankSchema.optional(),settlement_plan_id:id.nullable().optional()}),
  z.object({action:z.literal("add_member"),vendor_id:id,email:z.string().email().transform(s=>s.toLowerCase())}),
- z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01).optional(),prices:z.array(z.object({currency_code:z.string().regex(/^[a-z]{3}$/),amount:z.number().positive().max(10000000)})).min(1).max(30).optional(),stock:z.number().int().min(0).max(10000000),shipping_package:z.object({weight_g:z.number().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150)}).nullable().optional()}),
+ z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),category_ids:z.array(id).max(20).optional(),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01).optional(),prices:z.array(z.object({currency_code:z.string().regex(/^[a-z]{3}$/),amount:z.number().positive().max(10000000)})).min(1).max(30).optional(),stock:z.number().int().min(0).max(10000000),shipping_package:z.object({weight_g:z.number().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150)}).nullable().optional()}),
  z.object({action:z.literal("review_product"),product_id:id,approval:z.enum(["approved","rejected"]),review_note:z.string().max(1000).default("")}),
  z.object({action:z.literal("vendor_settings"),vendor_id:id,status:z.enum(["active","suspended"]),commission_bps:z.number().int().min(0).max(10000),payment_mode:z.enum(["hash_collects","vendor_direct"]),payout_details:z.string().max(2000),name:z.string().min(2).max(150).optional(),business_details:businessSchema.optional(),bank_details:bankSchema.optional(),settlement_plan_id:id.nullable().optional()}),
  z.object({action:z.literal("verify_otp"),order_id:id,code:z.string().regex(/^\d{6}$/)}),
@@ -46,10 +47,10 @@ export async function GET(req: MedusaRequest,res: MedusaResponse) {
  const user = await req.scope.resolve(Modules.USER).retrieveUser(a.id)
  const products = await catalog(req.scope,filter)
  const [store]=await req.scope.resolve(Modules.STORE).listStores({}, {relations:["supported_currencies"]})
- const countries=a.superAdmin?await req.scope.resolve(Modules.REGION).listCountries({}, {take:500}):[]
+ const countries=await req.scope.resolve(Modules.REGION).listCountries({}, {take:500})
  const auditRows = a.superAdmin ? (await db().query("SELECT * FROM hash_audit ORDER BY id DESC LIMIT 100")).rows : []
  res.setHeader("Cache-Control","no-store")
- res.json({actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},countries:countries.map(c=>({code:c.iso_2,name:c.display_name})),vendors:vendors.map(v=>publicVendor(v,a)),currencies:store.supported_currencies.map(c=>c.currency_code),products,orders,settlements,members,audit:auditRows,plans:await readPlans(),policy:{currency:store.supported_currencies.find(c=>c.is_default)?.currency_code?.toUpperCase(),plan:await selectedPlan(db(),a.vendor_id||""),summary:planSummary(await selectedPlan(db(),a.vendor_id||""))}})
+ res.json({categories:await categories(req.scope),actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},countries:countries.map(c=>({code:c.iso_2,name:c.display_name})),vendors:vendors.map(v=>publicVendor(v,a)),currencies:store.supported_currencies.map(c=>c.currency_code),products,orders,settlements,members,audit:auditRows,plans:await readPlans(),policy:{currency:store.supported_currencies.find(c=>c.is_default)?.currency_code?.toUpperCase(),plan:await selectedPlan(db(),a.vendor_id||""),summary:planSummary(await selectedPlan(db(),a.vendor_id||""))}})
 }
 export async function POST(req: MedusaRequest,res: MedusaResponse) {
  const a = await actor(req), parsed = commands.safeParse(req.body)

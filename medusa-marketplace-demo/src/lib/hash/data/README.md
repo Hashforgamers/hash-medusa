@@ -1,0 +1,1 @@
+Country/state data: country-region-data 4.1.0, MIT. Source: https://github.com/country-regions/country-region-data . Vendored from the npm release data.json; no runtime network dependency. Update the dataset and run geography tests when updating. This list does not enable shipping to a country; checkout markets remain controlled by Operations Settings.

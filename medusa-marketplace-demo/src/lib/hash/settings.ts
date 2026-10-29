@@ -1,3 +1,4 @@
+import { normalizeState } from './geography'
 import { Modules } from "@medusajs/framework/utils"
 import { createRegionsWorkflow, updateRegionsWorkflow, updateStoresWorkflow, createStockLocationsWorkflow, updateStockLocationsWorkflow, linkSalesChannelsToStockLocationWorkflow, createShippingOptionsWorkflow, updateShippingOptionsWorkflow } from "@medusajs/medusa/core-flows"
 import { z } from "zod"
@@ -57,6 +58,7 @@ export async function changeSettings(container:any,a:any,b:z.infer<typeof settin
     break
    }
    case 'location':{
+    try{b.address.province=normalizeState(b.address.country_code,b.address.province)}catch(e){fail(e.message)}
     const countries=await regionService.listCountries({iso_2:[b.address.country_code]})
     if(!countries.length)fail('Choose a valid country')
     const existingNames=await container.resolve(Modules.STOCK_LOCATION).listStockLocations({name:b.name})

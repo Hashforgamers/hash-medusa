@@ -1,9 +1,12 @@
+import { filterCatalogCategory } from '../../../../lib/hash/categories'
 import { db } from "../../../../lib/hash/db"
 import { catalog } from "../../../../lib/hash/marketplace"
 export async function GET(req:any,res:any) {
  res.setHeader("Cache-Control","no-store")
  const vendor=typeof req.query.vendor_id==="string"?req.query.vendor_id:undefined
- const products=await catalog(req.scope,vendor,true)
+ if(req.query.category_id!==undefined&&typeof req.query.category_id!=="string")return res.status(400).json({message:"category_id must be a single category ID"})
+ const categoryId=typeof req.query.category_id==="string"?req.query.category_id:undefined
+ const products=filterCatalogCategory(await catalog(req.scope,vendor,true),categoryId)
  const offset=Math.max(0,Number(req.query.offset)||0),limit=Math.min(100,Math.max(1,Number(req.query.limit)||20))
  const page=products.slice(offset,offset+limit)
  const {rows:ratings}=await db().query("SELECT product_id,count(*)::integer AS count,round(avg(rating),2)::float AS average FROM hash_product_review WHERE status='approved' AND product_id=ANY($1::text[]) GROUP BY product_id",[page.map(p=>p.product_id)])
