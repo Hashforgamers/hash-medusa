@@ -1,3 +1,4 @@
+import { commercialTerms } from '../../../lib/hash/commercial'
 import { categories } from '../../../lib/hash/categories'
 import { deliveryCommand, updateDelivery, tracking, shippingLabel } from '../../../lib/hash/delivery'
 import { readPlans, selectedPlan, planSummary } from "../../../lib/hash/settlement-plans"
@@ -50,7 +51,7 @@ export async function GET(req: MedusaRequest,res: MedusaResponse) {
  const countries=await req.scope.resolve(Modules.REGION).listCountries({}, {take:500})
  const auditRows = a.superAdmin ? (await db().query("SELECT * FROM hash_audit ORDER BY id DESC LIMIT 100")).rows : []
  res.setHeader("Cache-Control","no-store")
- res.json({categories:await categories(req.scope),actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},countries:countries.map(c=>({code:c.iso_2,name:c.display_name})),vendors:vendors.map(v=>publicVendor(v,a)),currencies:store.supported_currencies.map(c=>c.currency_code),products,orders,settlements,members,audit:auditRows,plans:await readPlans(),policy:{currency:store.supported_currencies.find(c=>c.is_default)?.currency_code?.toUpperCase(),plan:await selectedPlan(db(),a.vendor_id||""),summary:planSummary(await selectedPlan(db(),a.vendor_id||""))}})
+ res.json({categories:await categories(req.scope),actor:{...a,password_change_required:user.metadata?.hash_password_change_required === true},countries:countries.map(c=>({code:c.iso_2,name:c.display_name})),vendors:vendors.map(v=>publicVendor({...v,effective_commercial:commercialTerms(v)},a)),currencies:store.supported_currencies.map(c=>c.currency_code),products,orders,settlements,members,audit:auditRows,plans:await readPlans(),policy:{currency:store.supported_currencies.find(c=>c.is_default)?.currency_code?.toUpperCase(),plan:await selectedPlan(db(),a.vendor_id||""),summary:planSummary(await selectedPlan(db(),a.vendor_id||""))}})
 }
 export async function POST(req: MedusaRequest,res: MedusaResponse) {
  const a = await actor(req), parsed = commands.safeParse(req.body)
@@ -89,7 +90,7 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
   if(b.settlement_plan_id!==undefined){if(b.settlement_plan_id&&!(await c.query('SELECT 1 FROM hash_settlement_plan WHERE id=$1 AND active',[b.settlement_plan_id])).rowCount)fail('Choose an active settlement plan');await c.query('UPDATE hash_vendor SET settlement_plan_id=$2 WHERE id=$1',[b.vendor_id,b.settlement_plan_id])}
   if(b.name)await c.query("UPDATE hash_vendor SET name=$2 WHERE id=$1",[b.vendor_id,b.name])
   if(b.business_details)await c.query("UPDATE hash_vendor SET business_details=$2 WHERE id=$1",[b.vendor_id,JSON.stringify(b.business_details)])
-  if(b.bank_details){await c.query("UPDATE hash_vendor SET bank_details=$2,bank_verified_at=NULL,bank_verified_by=NULL,bank_revision=bank_revision+1 WHERE id=$1",[b.vendor_id,JSON.stringify(storedBank(b.bank_details))]);await audit(c,a.id,"bank_details_updated",b.vendor_id)}
+  if(b.bank_details){await c.query("UPDATE hash_vendor SET bank_details=$2,auto_payout=false,bank_verified_at=NULL,bank_verified_by=NULL,bank_revision=bank_revision+1 WHERE id=$1",[b.vendor_id,JSON.stringify(storedBank(b.bank_details))]);await audit(c,a.id,"bank_details_updated",b.vendor_id)}
   await audit(c,a.id,"vendor_settings_updated",b.vendor_id,{status:b.status,commission_bps:b.commission_bps,payment_mode:b.payment_mode})
  });result={ok:true};break
  case "payout_failed": {

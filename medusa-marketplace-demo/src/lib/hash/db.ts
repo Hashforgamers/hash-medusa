@@ -1,3 +1,4 @@
+import { installAccountJournal } from './account-journal'
 import { Pool, PoolClient } from "pg"
 let pool: Pool
 export function db(): Pool {
@@ -25,6 +26,10 @@ export async function migrate() {
     payment_mode text NOT NULL DEFAULT 'hash_collects' CHECK(payment_mode IN ('hash_collects','vendor_direct')),
     payout_details text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now()
   );
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS auto_payout boolean NOT NULL DEFAULT false;
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS auto_payout_daily_minor bigint NOT NULL DEFAULT 0;
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS commercial_terms jsonb NOT NULL DEFAULT '{}';
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS commercial_revision integer NOT NULL DEFAULT 0;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS business_details jsonb NOT NULL DEFAULT '{}';
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_details jsonb NOT NULL DEFAULT '{}';
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_revision integer NOT NULL DEFAULT 0;
@@ -190,9 +195,20 @@ export async function migrate() {
   CREATE INDEX IF NOT EXISTS hash_order_vendor ON hash_order(vendor_id);
   CREATE INDEX IF NOT EXISTS hash_settlement_due ON hash_settlement(status,due_at);
   `)
+  await db().query(`
+   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS commercial_snapshot jsonb NOT NULL DEFAULT '{}';
+   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS platform_fee_paise bigint NOT NULL DEFAULT 0;
+   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS gateway_fee_paise bigint;
+   ALTER TABLE hash_order ADD COLUMN IF NOT EXISTS gateway_tax_paise bigint;
+   ALTER TABLE hash_cart_shipping_quote ADD COLUMN IF NOT EXISTS commercial_snapshot jsonb NOT NULL DEFAULT '{}';
+   ALTER TABLE hash_cart_shipping_quote ADD COLUMN IF NOT EXISTS platform_fee_paise bigint NOT NULL DEFAULT 0;
+   ALTER TABLE hash_checkout_shipping_receipt ADD COLUMN IF NOT EXISTS commercial_snapshot jsonb NOT NULL DEFAULT '{}';
+   ALTER TABLE hash_checkout_shipping_receipt ADD COLUMN IF NOT EXISTS platform_fee_paise bigint NOT NULL DEFAULT 0;
+  `)
   if(!existing.ready){
     const holidays=(process.env.HASH_SETTLEMENT_HOLIDAYS||'').split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s))
     await db().query("UPDATE hash_order SET settlement_plan=jsonb_set(settlement_plan,'{holidays}',$1::jsonb) WHERE settlement_plan->>'id'='legacy'",[JSON.stringify(holidays)])
     await db().query("UPDATE hash_settlement_plan SET definition=jsonb_set(definition,'{holidays}',$1::jsonb) WHERE id='default' AND revision=1",[JSON.stringify(holidays)])
   }
+  await installAccountJournal(db())
 }

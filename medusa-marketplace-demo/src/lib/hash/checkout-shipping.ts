@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'util'
+import { commercialTerms } from './commercial'
 import { createHash,randomUUID } from 'crypto'
 import { db,transaction } from './db'
 import { fail } from './access'
@@ -9,7 +11,7 @@ export function cartFingerprint(cart:any){
 export async function cartShippingVendor(cart:any){
  const ids=[...new Set((cart.items||[]).map((i:any)=>i.product_id||i.variant?.product_id||i.product?.id))]
  if(!ids.length||ids.some(x=>!x))fail('Add products before calculating delivery')
- const {rows}=await db().query('SELECT l.*,v.shipping_payer,v.shipping_policy_revision,v.status,v.name AS vendor_name FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id WHERE l.product_id=ANY($1::text[])',[ids])
+ const {rows}=await db().query('SELECT l.*,v.shipping_payer,v.shipping_policy_revision,v.commission_bps,v.commercial_terms,v.commercial_revision,v.status,v.name AS vendor_name FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id WHERE l.product_id=ANY($1::text[])',[ids])
  if(rows.length!==ids.length||new Set(rows.map(r=>r.vendor_id)).size!==1||rows.some(r=>r.status!=='active'||r.approval!=='approved'))fail('Cart must contain approved products from one active vendor')
  return {vendor:rows[0],listings:rows,physical:rows.some(r=>r.kind==='product')}
 }
@@ -30,9 +32,12 @@ export async function checkoutShippingQuote(cart:any){
 
  const {vendor,listings,physical}=await cartShippingVendor(cart)
  if(cart.currency_code!=='inr')fail('Hash calculated delivery currently supports INR only')
+ const terms:any=commercialTerms(vendor)
+ const {rows:categories}=await db().query('SELECT product_id,product_category_id FROM product_category_product WHERE product_id=ANY($1::text[])',[listings.map(l=>l.product_id)])
+ terms.product_rates=Object.fromEntries(listings.map(l=>{const rates=categories.filter(c=>c.product_id===l.product_id).map(c=>terms.category_rates[c.product_category_id]).filter(r=>r!==undefined);return [l.product_id,rates.length?Math.min(...rates):terms.commission_bps]}))
  const fingerprint=cartFingerprint(cart)
  return transaction(`cart-shipping:${cart.id}`,async c=>{
-  const {rows:[old]}=await c.query('SELECT * FROM hash_cart_shipping_quote WHERE cart_id=$1',[cart.id]);if(old&&old.fingerprint===fingerprint&&old.policy_revision===vendor.shipping_policy_revision&&new Date(old.expires_at)>new Date())return old
+  const {rows:[old]}=await c.query('SELECT * FROM hash_cart_shipping_quote WHERE cart_id=$1',[cart.id]);if(old&&old.fingerprint===fingerprint&&old.policy_revision===vendor.shipping_policy_revision&&isDeepStrictEqual(old.commercial_snapshot,terms)&&new Date(old.expires_at)>new Date())return old
   let amount=0;const payer=physical?vendor.shipping_payer:'seller'
   if(payer==='customer'){
    const a=cart.shipping_address;if(a?.country_code?.toLowerCase()!=='in'||!/^\d{6}$/.test(a?.postal_code))fail('Add an Indian delivery address to calculate shipping')
@@ -42,18 +47,20 @@ export async function checkoutShippingQuote(cart:any){
    amount=estimatePaise(await delhiveryRequest(cfg.token,'/api/kinko/v1/invoice/charges/.json?'+new URLSearchParams({md:'S',ss:'Delivered',d_pin:a.postal_code,o_pin:pickup.pincode,cgm:String(p.weight_g),pt:'Pre-paid',l:String(p.length_cm),b:String(p.width_cm),h:String(p.height_cm),ipkg_type:'box'})))
   }
   const {rows:[quote]}=await c.query('INSERT INTO hash_cart_shipping_quote(cart_id,id,vendor_id,payer,fingerprint,amount_paise,policy_revision,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,now()+interval \'15 minutes\') ON CONFLICT(cart_id) DO UPDATE SET id=$2,vendor_id=$3,payer=$4,fingerprint=$5,amount_paise=$6,policy_revision=$7,expires_at=now()+interval \'15 minutes\',created_at=now() RETURNING *',[cart.id,randomUUID(),vendor.vendor_id,payer,fingerprint,amount,vendor.shipping_policy_revision]);
-  await c.query('INSERT INTO hash_checkout_shipping_receipt(id,cart_id,fingerprint,amount_paise) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING',[quote.id,cart.id,fingerprint,amount]);return quote
+  await c.query('UPDATE hash_cart_shipping_quote SET commercial_snapshot=$2,platform_fee_paise=$3 WHERE cart_id=$1',[cart.id,JSON.stringify(terms),terms.platform_fee_minor]);quote.commercial_snapshot=terms;quote.platform_fee_paise=terms.platform_fee_minor
+  await c.query('INSERT INTO hash_checkout_shipping_receipt(id,cart_id,fingerprint,amount_paise) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING',[quote.id,cart.id,fingerprint,amount]);
+  await c.query('UPDATE hash_checkout_shipping_receipt SET commercial_snapshot=$2,platform_fee_paise=$3 WHERE id=$1',[quote.id,JSON.stringify(terms),terms.platform_fee_minor]);return quote
  })
 }
 export async function validateCheckoutShipping(cart:any){
- const {physical,vendor}=await cartShippingVendor(cart);if(!physical)return
+ const {physical,vendor}=await cartShippingVendor(cart);const terms=commercialTerms(vendor);if(!physical&&!terms.version)return
  const methods=cart.shipping_methods||[];
  // Preserve existing seller-paid carts created before calculated delivery was introduced.
- if(vendor.shipping_payer==='seller'&&methods.length===1&&!methods[0].data?.hash_shipping_quote_id&&Number(methods[0].amount)===0&&!methods[0].adjustments?.length)return
+ if(!terms.version&&vendor.shipping_payer==='seller'&&methods.length===1&&!methods[0].data?.hash_shipping_quote_id&&Number(methods[0].amount)===0&&!methods[0].adjustments?.length)return
  if(methods.length!==1||!methods[0].data?.hash_shipping_quote_id)fail('Select Hash delivery again before paying')
  const {rows:[q]}=await db().query('SELECT * FROM hash_checkout_shipping_receipt WHERE cart_id=$1 AND id=$2',[cart.id,methods[0].data.hash_shipping_quote_id])
  if(!q||q.fingerprint!==cartFingerprint(cart))fail('Cart or address changed; select delivery again before paying')
  // The accepted quote is fixed for this checkout. Never recalculate after Razorpay captured payment.
- if(Math.round(Number(methods[0].amount)*100)!==Number(q.amount_paise))fail('Delivery price changed; refresh checkout')
+ if(Math.round(Number(methods[0].amount)*100)!==Number(q.amount_paise)+Number(q.platform_fee_paise))fail('Delivery price changed; refresh checkout')
  if(methods[0].adjustments?.length)fail('Shipping discounts are not supported for carrier delivery')
 }

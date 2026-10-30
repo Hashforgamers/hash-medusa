@@ -55,14 +55,15 @@ export default class RazorpayProvider extends AbstractPaymentProvider<Options> {
     return { id: order.id, data, status: PaymentSessionStatus.PENDING }
   }
   private async verified(data: any) {
-    data = this.validate(data)
+    data = {...this.validate(data)}
+    delete data.gateway_fee_minor; delete data.gateway_tax_minor
     const order = await this.request('/orders/' + data.id)
     if (order.id !== data.id || order.amount !== data.amount || order.currency !== data.currency || order.notes?.medusa_session_id !== data.session_id) throw Error('Razorpay order does not match this checkout')
     if (order.status !== 'paid' || order.amount_paid !== data.amount || order.amount_due !== 0) return { data, status: PaymentSessionStatus.PENDING }
     const payments = await this.request('/orders/' + data.id + '/payments')
     const payment = payments.items?.find((p: any) => p.order_id === data.id && p.status === 'captured' && p.captured === true && p.amount === data.amount && p.currency === data.currency && (p.amount_refunded || 0) === 0)
     if (!payment || !/^pay_[A-Za-z0-9]+$/.test(payment.id)) return { data, status: PaymentSessionStatus.PENDING }
-    return { data: { ...data, payment_id: payment.id }, status: PaymentSessionStatus.CAPTURED }
+    return { data: { ...data, payment_id: payment.id, ...(Number.isSafeInteger(payment.fee)&&payment.fee>=0?{gateway_fee_minor:payment.fee,gateway_tax_minor:Number.isSafeInteger(payment.tax)?payment.tax:0}: {}) }, status: PaymentSessionStatus.CAPTURED }
   }
   async authorizePayment(input: AuthorizePaymentInput) {
     if (this.options.mode) return (await this.bound()).authorizePayment(input)

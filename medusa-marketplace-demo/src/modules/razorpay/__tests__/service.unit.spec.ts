@@ -27,3 +27,6 @@ it('rejects changed totals instead of using the old payment order', async()=>{aw
 it('fails closed on Razorpay outages',async()=>{fetchMock.mockRejectedValue(new Error('timeout'));await expect(provider.authorizePayment({data,context:{idempotency_key:session_id}})).rejects.toThrow('did not respond')})
 it('does not claim refunds or paid cancellation succeeded',async()=>{await expect(provider.refundPayment({data,amount:10})).rejects.toThrow('reconciliation');remote();await expect(provider.cancelPayment({data})).rejects.toThrow('already captured')})
 it('does not accept unsigned webhook payment claims',async()=>{expect(await provider.getWebhookActionAndData({} as any)).toEqual({action:'not_supported'})})
+
+it('records only provider-confirmed gateway fees and does not add GST twice',async()=>{remote({}, {fee:236,tax:36});const r=await provider.authorizePayment({data:{...data,gateway_fee_minor:99999},context:{idempotency_key:session_id}});expect(r.data).toMatchObject({gateway_fee_minor:236,gateway_tax_minor:36})})
+it('drops client-supplied fees when the provider fee is unknown',async()=>{remote();const r=await provider.authorizePayment({data:{...data,gateway_fee_minor:99999,gateway_tax_minor:1},context:{idempotency_key:session_id}});expect(r.data.gateway_fee_minor).toBeUndefined();expect(r.data.gateway_tax_minor).toBeUndefined()})
