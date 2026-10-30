@@ -6,6 +6,8 @@ export const commercialSchema=z.object({
  pilot_start:z.string().datetime(), pilot_days:z.number().int().min(1).max(365),
  pilot_commission_bps:z.number().int().min(0).max(10000),
  platform_fee_minor:z.number().int().min(0).max(100000),
+ gateway_estimate_bps:z.number().int().min(0).max(10000).default(200),
+ gateway_tax_bps:z.number().int().min(0).max(10000).default(1800),
  platform_tax_bps:z.number().int().min(0).max(10000),
  regular_commission_bps:z.number().int().min(0).max(10000).nullable(),
  category_rates:z.record(z.number().int().min(0).max(10000)).default({}),
@@ -13,9 +15,10 @@ export const commercialSchema=z.object({
 }).superRefine((b,c)=>{if(b.enabled&&!b.agreement_reference)c.addIssue({code:'custom',path:['agreement_reference'],message:'Record the agreed commercial terms before activation'})})
 export function commercialTerms(v:any,at=new Date()){
  const p=v.commercial_terms
- if(!p?.enabled)return {version:0,commission_bps:v.commission_bps,platform_fee_minor:0,platform_tax_bps:0,gateway_payer:'hash',phase:'existing',category_rates:{}}
+ const estimates={gateway_estimate_bps:p?.gateway_estimate_bps??200,gateway_tax_bps:p?.gateway_tax_bps??1800}
+ if(!p?.enabled)return {...estimates,version:0,commission_bps:v.commission_bps,platform_fee_minor:0,platform_tax_bps:0,gateway_payer:'hash',phase:'existing',category_rates:{}}
  const start=new Date(p.pilot_start),end=new Date(start.getTime()+p.pilot_days*86400000),ended=at>=end,started=at>=start
- return {version:v.commercial_revision,commission_bps:!started?v.commission_bps:ended?(p.regular_commission_bps??p.pilot_commission_bps):p.pilot_commission_bps,
+ return {...estimates,version:v.commercial_revision,commission_bps:!started?v.commission_bps:ended?(p.regular_commission_bps??p.pilot_commission_bps):p.pilot_commission_bps,
  platform_fee_minor:started?p.platform_fee_minor:0,platform_tax_bps:p.platform_tax_bps,gateway_payer:'hash',
  phase:!started?'scheduled':ended?(p.regular_commission_bps===null?'pilot_expired_review_required':'regular'):'pilot',
  pilot_start:start.toISOString(),pilot_end:end.toISOString(),category_rates:ended?p.category_rates:{},agreement_reference:p.agreement_reference}
@@ -23,7 +26,7 @@ export function commercialTerms(v:any,at=new Date()){
 export function pricePreview(product:number,shipping:number,terms:any){
  if(!Number.isSafeInteger(product)||product<0||!Number.isSafeInteger(shipping)||shipping<0)throw Error('Invalid price')
  const fee=terms.platform_fee_minor,commission=Math.floor(product*terms.commission_bps/10000),total=product+shipping+fee
- const gatewayBase=Math.round(total*200/10000),gatewayTax=Math.round(gatewayBase*1800/10000)
+ const gatewayBase=Math.round(total*(terms.gateway_estimate_bps??200)/10000),gatewayTax=Math.round(gatewayBase*(terms.gateway_tax_bps??1800)/10000)
  return {product_minor:product,customer_delivery_minor:shipping,platform_fee_minor:fee,platform_fee_tax_minor:Math.round(fee*terms.platform_tax_bps/(10000+terms.platform_tax_bps)),customer_total_minor:total,commission_minor:commission,seller_before_courier_minor:product+shipping-commission,gateway_estimate_minor:gatewayBase+gatewayTax,hash_contribution_estimate_minor:commission+fee-gatewayBase-gatewayTax}
 }
 export async function saveCommercial(a:any,input:any){

@@ -26,6 +26,8 @@ export async function migrate() {
     payment_mode text NOT NULL DEFAULT 'hash_collects' CHECK(payment_mode IN ('hash_collects','vendor_direct')),
     payout_details text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now()
   );
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS auto_payout_min_minor bigint NOT NULL DEFAULT 0;
+  ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS auto_payout_max_minor bigint NOT NULL DEFAULT 0;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS auto_payout boolean NOT NULL DEFAULT false;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS auto_payout_daily_minor bigint NOT NULL DEFAULT 0;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS commercial_terms jsonb NOT NULL DEFAULT '{}';
