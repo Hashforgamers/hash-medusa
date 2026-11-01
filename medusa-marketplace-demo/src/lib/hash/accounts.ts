@@ -35,6 +35,19 @@ export async function accounts(a:any,query:any){
  WHERE ($1::text IS NULL OR o.vendor_id=$1) AND ($2::timestamptz IS NULL OR o.created_at>=$2) AND ($3::timestamptz IS NULL OR o.created_at<$3) ORDER BY o.created_at DESC,o.order_id`,[vendor,from,to])
  const all=rows.map(o=>accountBreakdown(o)),totals:any={}
  for(const o of all){const t=totals[o.currency_code]||={currency_code:o.currency_code,orders:0,gateway_pending_orders:0,provisional_orders:0};t.orders++;if(!o.settlement_final)t.provisional_orders++;for(const k of ['hash_gateway_cost_minor','vendor_gateway_fee_minor','settlement_gross_minor','total_deductions_minor','customer_paid_minor','customer_refunded_minor','platform_fee_minor','platform_fee_tax_minor','commission_minor','courier_fee_minor','seller_entitlement_minor','paid_minor','processing_minor','balance_minor','ready_minor','held_minor','future_minor','recovery_minor'])t[k]=(t[k]||0)+o[k];if(o.gateway_fee_minor===null)t.gateway_pending_orders++;else t.gateway_fee_minor=(t.gateway_fee_minor||0)+o.gateway_fee_minor}
+ if(query.view==='payouts'&&!query.order_id){
+  const orders=new Map<string,ReturnType<typeof accountBreakdown>>(all.map(o=>[o.order_id,o] as const))
+  const ids=all.map(o=>o.order_id)
+  const {rows:[counter]}=await db().query('SELECT count(*)::int AS count FROM hash_settlement WHERE order_id=ANY($1::text[])',[ids])
+  const {rows:milestones}=await db().query(`SELECT id,order_id,milestone,amount_paise,due_at,status,reference,paid_at,failure_reason FROM hash_settlement WHERE order_id=ANY($1::text[]) ORDER BY due_at DESC,id LIMIT $2 OFFSET $3`,[ids,limit,offset])
+  const payouts=milestones.map(s=>{
+   const order=orders.get(s.order_id)
+   const hold=['scheduled','failed'].includes(s.status)?order.hold_reason:null
+   const status=s.status==='scheduled'?(hold?'On hold':Number(s.amount_paise)===0?'No amount due':new Date(s.due_at)<=new Date()?'Ready for payout':'Scheduled'):({paid:'Paid',processing:'Transfer in progress',failed:'Transfer failed'}[s.status]||s.status)
+   return {settlement_id:s.id,order_id:s.order_id,vendor_name:order.vendor_name,currency_code:order.currency_code,milestone:s.milestone,amount_minor:Number(s.amount_paise),due_at:s.due_at,status,hold_reason:hold,failure_reason:s.failure_reason,reference:s.reference,paid_at:s.paid_at}
+  })
+  return {payouts,count:counter.count,limit,offset}
+ }
  let detail:any=null
  if(query.order_id){const o=all.find(o=>o.order_id===query.order_id);if(!o)fail('Order not found');const {rows:settlements}=await db().query('SELECT id,milestone,amount_paise,due_at,status,provider,reference,paid_at,failure_reason FROM hash_settlement WHERE order_id=$1 ORDER BY due_at,id',[o.order_id]);const {rows:history}=await db().query(`SELECT id,event_type,details,created_at FROM hash_account_event WHERE order_id=$1 ORDER BY id`,[o.order_id]);const {rows:adjustments}=await db().query(`SELECT action,created_at,detail->>'note' AS note,detail->>'reference' AS reference,detail->>'amount_paise' AS amount_minor FROM hash_audit WHERE (entity_id=$1 OR entity_id IN (SELECT id FROM hash_settlement WHERE order_id=$1)) AND action IN ('manual_payout_recorded','shipping_invoice_reconciled','refund_settlement_adjusted','provider_payout_manually_resolved','payout_failed') ORDER BY id`,[o.order_id]);detail={order:o,settlements,history,adjustments}}
  return {totals:Object.values(totals),orders:all.slice(offset,offset+limit),count:all.length,offset,limit,detail,date_basis:'Order creation date; balances include subsequent activity for those orders. Current amounts, not a historical balance as of the end date.'}
