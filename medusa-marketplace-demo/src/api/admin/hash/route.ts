@@ -1,3 +1,4 @@
+import { specValues, skuRows } from '../../../lib/hash/specifications'
 import { commercialTerms } from '../../../lib/hash/commercial'
 import { categories } from '../../../lib/hash/categories'
 import { deliveryCommand, updateDelivery, tracking, shippingLabel } from '../../../lib/hash/delivery'
@@ -16,7 +17,7 @@ const commands = z.discriminatedUnion("action",[
  z.object({action:z.literal("shipping_label"),order_id:id}),
  z.object({action:z.literal("onboard"),name:z.string().min(2).max(150),email:z.string().email().transform(s=>s.toLowerCase()),commission_bps:z.number().int().min(0).max(10000).default(0),payment_mode:z.enum(["hash_collects","vendor_direct"]).default("hash_collects"),payout_details:z.string().max(2000).default(""),business_details:businessSchema.optional(),bank_details:bankSchema.optional(),settlement_plan_id:id.nullable().optional()}),
  z.object({action:z.literal("add_member"),vendor_id:id,email:z.string().email().transform(s=>s.toLowerCase())}),
- z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),category_ids:z.array(id).max(20).optional(),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01).optional(),prices:z.array(z.object({currency_code:z.string().regex(/^[a-z]{3}$/),amount:z.number().positive().max(10000000)})).min(1).max(30).optional(),stock:z.number().int().min(0).max(10000000),shipping_package:z.object({weight_g:z.number().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150)}).nullable().optional()}),
+ z.object({action:z.literal("save_product"),vendor_id:id,product_id:id.optional(),title:z.string().min(2).max(200),specifications:specValues.optional(),variants:skuRows.optional(),category_ids:z.array(id).max(20).optional(),description:z.string().max(10000).default(""),thumbnail:z.union([z.string().url().refine(s=>s.startsWith("https://"),"Use an HTTPS image URL"),z.literal("")]).default(""),kind:z.enum(["product","service"]),price_inr:z.number().positive().max(10000000).multipleOf(0.01).optional(),prices:z.array(z.object({currency_code:z.string().regex(/^[a-z]{3}$/),amount:z.number().positive().max(10000000)})).min(1).max(30).optional(),stock:z.number().int().min(0).max(10000000),shipping_package:z.object({weight_g:z.number().positive().max(30000),length_cm:z.number().positive().max(150),width_cm:z.number().positive().max(150),height_cm:z.number().positive().max(150)}).nullable().optional()}),
  z.object({action:z.literal("review_product"),product_id:id,approval:z.enum(["approved","rejected"]),review_note:z.string().max(1000).default("")}),
  z.object({action:z.literal("vendor_settings"),vendor_id:id,status:z.enum(["active","suspended"]),commission_bps:z.number().int().min(0).max(10000),payment_mode:z.enum(["hash_collects","vendor_direct"]),payout_details:z.string().max(2000),name:z.string().min(2).max(150).optional(),business_details:businessSchema.optional(),bank_details:bankSchema.optional(),settlement_plan_id:id.nullable().optional()}),
  z.object({action:z.literal("verify_otp"),order_id:id,code:z.string().regex(/^\d{6}$/)}),
@@ -24,7 +25,7 @@ const commands = z.discriminatedUnion("action",[
  z.object({action:z.literal("payout_failed"),settlement_id:id,reason:z.string().min(3).max(1000)}),
  z.object({action:z.literal("reconcile")}),
  z.object({action:z.literal("review_adjustment"),order_id:id,note:z.string().min(3).max(1000)}),
- z.object({action:z.literal("stock"),product_id:id,stock:z.number().int().min(0).max(10000000)}),
+ z.object({action:z.literal("stock"),product_id:id,variant_id:id.optional(),stock:z.number().int().min(0).max(10000000)}),
  z.object({action:z.literal("change_password"),current_password:z.string().min(1),new_password:z.string().min(12).max(200)}),
  z.object({action:z.literal("remove_member"),user_id:id})
 ])
@@ -75,7 +76,7 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
  }
  case "onboard": result=await onboard(req.scope,a,b); break
  case "add_member": result=await addMember(req.scope,a,b); break
- case "save_product": if(!b.prices&&!b.price_inr)fail("Provide listing prices");result=await saveProduct(req.scope,a,b); break
+ case "save_product": if(!b.prices&&!b.price_inr&&!b.variants?.length)fail("Provide listing prices");result=await saveProduct(req.scope,a,b); break
  case "review_product": result=await reviewProduct(req.scope,a,b); break
  case "verify_otp": result=await verifyOtp(req.scope,a,b.order_id,b.code); break
  case "record_payout": requireHash(a);result=await recordPayout(req.scope,a,b.settlement_id,b.reference);break
@@ -83,7 +84,7 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
  case "reconcile": requireHash(a);await reconcileAll(req.scope);result={ok:true};break
  case "stock": {
   const {rows:[p]}=await db().query("SELECT * FROM hash_listing WHERE product_id=$1",[b.product_id]); if(!p) fail("Product not found");own(a,p.vendor_id)
-  await transaction(`product:${b.product_id}`,async c=>{await setStock(req.scope,b.product_id,b.stock);await audit(c,a.id,"stock_updated",b.product_id,{stock:b.stock})});result={ok:true};break
+  await transaction(`product:${b.product_id}`,async c=>{await setStock(req.scope,b.product_id,b.stock,b.variant_id);await audit(c,a.id,"stock_updated",b.product_id,{stock:b.stock})});result={ok:true};break
  }
  case "vendor_settings": requireHash(a);await transaction(`vendor:${b.vendor_id}`,async c=>{
   const {rowCount}=await c.query("UPDATE hash_vendor SET status=$2,commission_bps=$3,payment_mode=$4,payout_details=$5 WHERE id=$1",[b.vendor_id,b.status,b.commission_bps,b.payment_mode,b.payout_details]);if(!rowCount)fail("Vendor not found")

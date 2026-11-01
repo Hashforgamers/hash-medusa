@@ -1,7 +1,8 @@
-import { validateCategoryIds } from './categories'
+import { validateSpecs } from "./specifications"
+import { categories, validateCategoryIds } from './categories'
 import { randomUUID, randomBytes } from "crypto"
 import { Modules } from "@medusajs/framework/utils"
-import { createProductsWorkflow, updateProductsWorkflow, updateProductVariantsWorkflow } from "@medusajs/medusa/core-flows"
+import { createProductVariantsWorkflow, updateProductOptionsWorkflow, createProductsWorkflow, updateProductVariantsWorkflow } from "@medusajs/medusa/core-flows"
 import { db, transaction, audit } from "./db"
 import { storedBank } from "./vendor-profile"
 import { currencyDigits } from "./policy"
@@ -55,7 +56,7 @@ export async function saveProduct(container: any,a: any,b: any) {
   const { rows:[vendor] } = await db().query("SELECT * FROM hash_vendor WHERE id=$1",[b.vendor_id])
   if (!vendor || vendor.status !== "active") fail("Vendor is not active")
   const [configuredStore] = await container.resolve(Modules.STORE).listStores({}, {relations:["supported_currencies"]})
-  const prices = b.prices || [{currency_code:"inr",amount:b.price_inr}]
+  const prices = b.variants?.length?[{currency_code:"inr",amount:b.variants[0].price_inr}]:b.prices || [{currency_code:"inr",amount:b.price_inr}]
   if(!prices.length || new Set(prices.map(p=>p.currency_code)).size!==prices.length) fail("Provide one price per currency")
   for(const p of prices){
     if(!configuredStore.supported_currencies.some(c=>c.currency_code===p.currency_code))fail("Enable the listing currency in Operations settings first")
@@ -67,6 +68,30 @@ export async function saveProduct(container: any,a: any,b: any) {
     const [store] = await container.resolve(Modules.STORE).listStores()
     const [profile] = await container.resolve(Modules.FULFILLMENT).listShippingProfiles({type:"default"})
     if (!store?.default_sales_channel_id || !profile) fail("Run Hash setup before creating listings")
+    const catalogService=container.resolve(Modules.PRODUCT)
+    if(productId){
+      const {rows:[owner]}=await c.query("SELECT vendor_id FROM hash_listing WHERE product_id=$1",[productId])
+      if(owner?.vendor_id!==b.vendor_id)fail("Product not found")
+    }
+    const old=productId?await catalogService.retrieveProduct(productId,{relations:['categories','variants','options','options.values']}):null
+    const ids=category_ids??old?.categories.map(x=>x.id)??[]
+    const specs=b.specifications??old?.metadata?.hash_specs??{}
+    const rows=b.variants||[]
+    validateSpecs((await categories(container)).filter(x=>ids.includes(x.id)),specs,rows)
+    const previous=old?.variants||[]
+    const configured=previous.filter(v=>v.metadata?.hash_options)
+    if(configured.some(v=>!rows.some(r=>r.id===v.id)))fail("Keep existing SKUs. Set stock to zero to stop selling a combination.")
+    if(rows.some(r=>r.id&&!previous.some(v=>v.id===r.id))||new Set(rows.filter(r=>r.id).map(r=>r.id)).size!==rows.filter(r=>r.id).length)fail("Unknown or duplicate variant ID")
+    if(rows.length&&old&&previous.some(v=>!rows.some(r=>r.id===v.id)))fail("Assign an option combination to each existing SKU")
+    const axes=Object.keys(rows[0]?.options||{}).sort()
+    // Legacy listings already have a native Standard option. Keep its ID so existing carts retain their variant.
+    const legacy=old?.options.some(o=>o.title==='Option')
+    const optionValues=(r:any)=>legacy?{Option:JSON.stringify(axes.map(k=>r.options[k]))}:r.options
+    const nativeRows=rows.map(r=>({title:axes.map(k=>r.options[k]).join(' / '),sku:r.sku,options:optionValues(r),metadata:{hash_options:r.options},prices:[{currency_code:'inr',amount:r.price_inr}],manage_inventory:true,allow_backorder:false}))
+    const options=Object.keys(nativeRows[0]?.options||{}).map(title=>({title,values:[...new Set<string>(nativeRows.map(r=>r.options[title]))]}))
+    if(rows.length&&old&&old.options.some(o=>!options.some(n=>n.title===o.title)))fail("Keep this listing's existing SKU option names")
+    if(rows.length&&!configuredStore.supported_currencies.some(c=>c.currency_code==='inr'))fail("Enable INR before listing these SKUs")
+    const metadata={...old?.metadata,hash_specs:specs}
     if (productId) {
       const { rows:[listing] } = await c.query("SELECT * FROM hash_listing WHERE product_id=$1",[productId])
       if (!listing || listing.vendor_id !== b.vendor_id) fail("Product not found")
@@ -74,29 +99,43 @@ export async function saveProduct(container: any,a: any,b: any) {
       // Unpublish before editing. A failed edit stays safely unpublished and pending.
       await container.resolve(Modules.PRODUCT).updateProducts(productId,{status:"draft"})
       await c.query("UPDATE hash_listing SET approval='pending',review_note='',updated_at=now() WHERE product_id=$1",[productId])
-      await updateProductsWorkflow(container).run({input:{selector:{id:productId},update:{...(category_ids!==undefined?{category_ids}:{}),title:b.title,description:b.description,thumbnail:b.thumbnail || null,status:"draft"}}})
-      const {data:[p]} = await container.resolve("query").graph({entity:"product",fields:["id","variants.id"],filters:{id:productId}})
-      await updateProductVariantsWorkflow(container).run({input:{product_variants:[{id:p.variants[0].id,prices}]}})
+      await catalogService.updateProducts(productId,{metadata,...(category_ids!==undefined?{category_ids}:{}),title:b.title,description:b.description,thumbnail:b.thumbnail || null,status:"draft"})
+      if(rows.length){
+        for(const opt of options){
+          const prior=old.options.find(o=>o.title===opt.title)
+          if(!prior)fail("Keep this listing's existing SKU option names")
+          const values=[...new Set<string>([...prior.values.map(v=>v.value),...opt.values])]
+          if(values.length!==prior.values.length)await updateProductOptionsWorkflow(container).run({input:{selector:{id:prior.id},update:{values}}})
+        }
+        const updates=nativeRows.flatMap((v,i)=>rows[i].id?[{...v,id:rows[i].id}]:[])
+        const adds=nativeRows.flatMap((v,i)=>rows[i].id?[]:[{...v,product_id:productId}])
+        if(updates.length)await updateProductVariantsWorkflow(container).run({input:{product_variants:updates}})
+        if(adds.length)await createProductVariantsWorkflow(container).run({input:{product_variants:adds}})
+      }else await updateProductVariantsWorkflow(container).run({input:{product_variants:[{id:previous[0].id,prices}]}})
     } else {
       const {result} = await createProductsWorkflow(container).run({input:{products:[{
-        category_ids:category_ids||[],title:b.title,description:b.description,thumbnail:b.thumbnail || undefined,status:"draft",shipping_profile_id:profile.id,
+        metadata,category_ids:category_ids||[],title:b.title,description:b.description,thumbnail:b.thumbnail || undefined,status:"draft",shipping_profile_id:profile.id,
         handle:`${b.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,60)}-${randomBytes(4).toString("hex")}`,
-        options:[{title:"Option",values:["Standard"]}],sales_channels:[{id:store.default_sales_channel_id}],
-        variants:[{title:"Standard",options:{Option:"Standard"},manage_inventory:true,allow_backorder:false,prices}]
+        options:rows.length?options:[{title:"Option",values:["Standard"]}],sales_channels:[{id:store.default_sales_channel_id}],
+        variants:rows.length?nativeRows:[{title:"Standard",options:{Option:"Standard"},manage_inventory:true,allow_backorder:false,prices}]
       }]}})
       productId = result[0].id
       await c.query("INSERT INTO hash_listing(product_id,vendor_id,kind) VALUES($1,$2,$3)",[productId,b.vendor_id,b.kind])
     }
     if(b.shipping_package!==undefined)await c.query('UPDATE hash_listing SET shipping_package=$2 WHERE product_id=$1',[productId,b.kind==='product'?JSON.stringify(b.shipping_package):null])
-    await setStock(container,productId,b.stock)
+    if(rows.length){
+      const variants=await catalogService.listProductVariants({product_id:productId})
+      for(const row of rows)await setStock(container,productId,row.stock,variants.find(v=>v.sku===row.sku).id)
+    }else await setStock(container,productId,b.stock)
     await c.query("UPDATE hash_listing SET kind=$2 WHERE product_id=$1",[productId,b.kind])
     await audit(c,a.id,"listing_submitted",productId,{vendor_id:b.vendor_id})
     return { product_id:productId,approval:"pending" }
   })
 }
-export async function setStock(container: any,productId: string,stock: number) {
-  const {data:[product]} = await container.resolve("query").graph({entity:"product",fields:["id","variants.inventory_items.inventory_item_id"],filters:{id:productId}})
-  const item = product?.variants?.[0]?.inventory_items?.[0]?.inventory_item_id
+export async function setStock(container: any,productId: string,stock: number,variantId?:string) {
+  const {data:[product]} = await container.resolve("query").graph({entity:"product",fields:["id","variants.id","variants.inventory_items.inventory_item_id"],filters:{id:productId}})
+  if(!variantId&&product?.variants?.length>1)fail("Select a SKU to update stock")
+  const item = (variantId?product?.variants.find(v=>v.id===variantId):product?.variants?.[0])?.inventory_items?.[0]?.inventory_item_id
   const [location] = await container.resolve(Modules.STOCK_LOCATION).listStockLocations({name:"Hash Fulfilment"})
   if (!item || !location) fail("Inventory configuration is missing")
   const inventory = container.resolve(Modules.INVENTORY)
@@ -123,12 +162,16 @@ export async function catalog(container: any, vendorId?: string, publicOnly=fals
   const {rows} = await db().query(`SELECT l.*,v.name AS vendor_name FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id
     WHERE ($1::text IS NULL OR l.vendor_id=$1) AND (NOT $2 OR (l.approval='approved' AND v.status='active')) ORDER BY l.updated_at DESC`,[vendorId || null,publicOnly])
   if (!rows.length) return []
-  const {data} = await container.resolve("query").graph({entity:"product",fields:["id","title","description","thumbnail","status","categories.id","categories.name","categories.handle","categories.is_active","categories.is_internal","variants.id","variants.prices.*","variants.inventory_items.inventory.location_levels.*"],filters:{id:rows.map(r=>r.product_id)}})
+  const {data} = await container.resolve("query").graph({entity:"product",fields:["id","title","description","thumbnail","status","metadata","variants.sku","variants.metadata","variants.title","categories.id","categories.name","categories.handle","categories.is_active","categories.is_internal","variants.id","variants.prices.*","variants.inventory_items.inventory.location_levels.*"],filters:{id:rows.map(r=>r.product_id)}})
   return rows.flatMap(r => {
     const p = data.find((p: any)=>p.id===r.product_id)
     if (!p || (publicOnly && p.status !== "published")) return []
     const variant = p.variants[0],levels = variant?.inventory_items?.flatMap((i: any)=>i.inventory?.location_levels || []) || []
-    return [{...r,categories:(p.categories||[]).filter(c=>c.is_active&&!c.is_internal).map(({id,name,handle})=>({id,name,handle})),title:p.title,description:p.description,thumbnail:p.thumbnail,status:p.status,variant_id:variant?.id,
+    const variants=p.variants.map(v=>{
+      const levels=v.inventory_items?.flatMap(i=>i.inventory?.location_levels||[])||[]
+      return {id:v.id,sku:v.sku,title:v.title,options:v.metadata?.hash_options||{},prices:(v.prices||[]).filter(x=>!x.price_list_id&&!x.min_quantity&&!x.max_quantity).map(x=>({currency_code:x.currency_code,amount:x.amount})),stock:levels.reduce((n,l)=>n+Number(l.stocked_quantity),0),available:levels.reduce((n,l)=>n+Number(l.stocked_quantity)-Number(l.reserved_quantity),0)}
+    })
+    return [{...r,specifications:p.metadata?.hash_specs||{},variants,categories:(p.categories||[]).filter(c=>c.is_active&&!c.is_internal).map(({id,name,handle})=>({id,name,handle})),title:p.title,description:p.description,thumbnail:p.thumbnail,status:p.status,variant_id:variant?.id,
       prices:(variant?.prices||[]).filter((p:any)=>!p.price_list_id&&!p.min_quantity&&!p.max_quantity).map((p:any)=>({currency_code:p.currency_code,amount:p.amount})),
       price_inr:variant?.prices?.find((p:any)=>p.currency_code==="inr")?.amount,
       stock:levels.reduce((n:number,l:any)=>n+Number(l.stocked_quantity || 0),0),
