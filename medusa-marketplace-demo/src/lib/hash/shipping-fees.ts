@@ -28,6 +28,11 @@ export async function applyShippingFee(c:any,orderId:string){
  await c.query('UPDATE hash_order SET recovery_paise=$2 WHERE order_id=$1',[orderId,allocation.recovery])
 }
 export async function assertShippingPayable(c:any,orderId:string){
+ const blocked=await c.query(`SELECT 1 FROM hash_order WHERE order_id=$1 AND (
+  canceled_at IS NOT NULL OR reviewed_canceled OR (captured_paise>0 AND refunded_paise>=captured_paise)
+  OR (cancellation_request IS NOT NULL AND cancellation_request->>'status' IS DISTINCT FROM 'closed')
+ )`,[orderId])
+ if(blocked.rowCount)fail('Vendor payout is blocked for this cancellation or full refund')
  if((await c.query("SELECT 1 FROM hash_order WHERE order_id=$1 AND commercial_snapshot->>'gateway_payer'='vendor' AND gateway_fee_paise IS NULL",[orderId])).rowCount)fail('Verified Razorpay charges are required before vendor-funded settlement')
  if((await c.query("SELECT 1 FROM hash_order o WHERE o.order_id=$1 AND ((o.delivery_kind='product' AND NOT EXISTS(SELECT 1 FROM hash_shipment hs WHERE hs.order_id=o.order_id AND hs.fee_final)) OR EXISTS(SELECT 1 FROM hash_shipment hs WHERE hs.order_id=o.order_id AND hs.fee_final=false AND hs.status<>'quoted'))",[orderId])).rowCount)fail('Reconcile the final Delhivery invoice charge before paying this order')
 }

@@ -48,3 +48,17 @@ test('vendor gateway funding is deducted once from the order snapshot, not curre
  expect(vendor).toMatchObject({gateway_payer:'vendor',vendor_gateway_fee_minor:4744,seller_entitlement_minor:179256,contribution_minor:7000,hash_gateway_cost_minor:0});
  expect(accountBreakdown(base)).toMatchObject({gateway_payer:'hash',vendor_gateway_fee_minor:0,seller_entitlement_minor:184000,hash_gateway_cost_minor:4744});
 });
+
+describe('cancellation and refund reporting',()=>{
+ const order={total_paise:10000,captured_paise:10000,net_paise:9700,paid_at:new Date(),payment_mode:'hash_collects',due:9700,currency_code:'inr'}
+ test('a courier request holds the sale without claiming the customer was refunded',()=>{
+  expect(accountBreakdown({...order,cancellation_request:{status:'courier_requested'}})).toMatchObject({cancellation_state:'Cancellation requested',ready_minor:0,held_minor:9700,customer_refunded_minor:0,no_sale_payout:false})
+ })
+ test('confirmed cancellation removes stale sale earnings and identifies prior transfers and actual costs',()=>{
+  expect(accountBreakdown({...order,canceled_at:new Date(),shipping_fee_paise:500,paid:2000,gateway_fee_paise:236})).toMatchObject({seller_entitlement_minor:-500,hash_gateway_cost_minor:236,ready_minor:0,recovery_minor:2500,refund_outstanding_minor:10000})
+ })
+ test('full refund before review blocks the sale; partial refund is separately classified',()=>{
+  expect(accountBreakdown({...order,refunded_paise:10000})).toMatchObject({cancellation_state:'Fully refunded',seller_entitlement_minor:0,ready_minor:0})
+  expect(accountBreakdown({...order,refunded_paise:2000,hold_reason:'Refund requires Hash review'})).toMatchObject({cancellation_state:'Partial refund',no_sale_payout:false,ready_minor:0})
+ })
+})
