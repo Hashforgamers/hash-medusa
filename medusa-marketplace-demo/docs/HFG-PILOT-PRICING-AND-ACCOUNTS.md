@@ -49,3 +49,16 @@ The configured platform GST percentage splits an inclusive fee for financial rep
 Provider assignment or replacement bank details disables automation. Failed/ambiguous transfers are not automatically retried. An asynchronous provider response remains processing until verified in Payment & payout setup; full automatic confirmation requires a provider-specific webhook/status integration. No live payout is executed as part of deployment or testing.
 
 Provider field reference: [Razorpay Payments Entity](https://razorpay.com/docs/api/payments/entity/) documents `fee` and `tax`; the illustrative estimate uses [published pricing](https://razorpay.com/pricing/), not a promise about this merchant's contracted rate.
+# Net settlement and prepaid courier charges
+
+Hash settles the vendor's net entitlement after the agreed commission, the customer platform fee retained by Hash, and the actual courier invoice. Hash pays the courier upfront and recovers the actual bill once, without markup.
+
+Customer delivery charges are included in gross receipts and offset the courier recovery. For example, a ₹2,000 product, ₹100 customer delivery charge and ₹10 customer platform fee produce ₹2,110 collected. With ₹60 commission and a ₹120 courier invoice, the vendor entitlement is ₹1,920. Seller-funded delivery has no customer delivery credit.
+
+Unpaid physical-order settlements require a reconciled final courier invoice before manual payout recording or provider transfer, including before a shipment is booked. The agreed payout schedule determines the due date. Fee reconciliation determines eligibility. Services without a shipment do not require a courier invoice.
+
+The accounts API adds `settlement_gross_minor`, `total_deductions_minor`, `reviewed_refund_minor`, `courier_estimate_minor`, `courier_invoice_reference`, `shipping_payer`, and `settlement_final`. API amounts remain minor units. CSV exports use major currency units. `settlement_final` describes charge reconciliation and adjustment review. `hold_reason` and `ready_minor` also reflect bank and partner checks.
+
+Razorpay remains a Hash expense under the agreed pilot. Completed bank transfers remain recorded. Courier corrections and refunds can produce an amount to recover, shown with review details in the statement.
+
+Operations can configure post-pilot Razorpay funding per partner in Pricing & pilot. The pilot always uses Hash funding. The configured post-pilot payer is captured in each new order. Vendor-funded orders deduct only the verified actual gateway fee, including the provider-recorded tax, and remain blocked if that fee is unknown. Existing orders retain their captured payer.

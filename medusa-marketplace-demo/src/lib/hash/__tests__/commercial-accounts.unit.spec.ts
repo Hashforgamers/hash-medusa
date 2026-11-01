@@ -25,3 +25,26 @@ describe('automatic payout authorization',()=>{
 })
 test('configurable gateway estimates do not reduce seller entitlement',()=>{const r=pricePreview(200000,0,{commission_bps:300,platform_fee_minor:1000,platform_tax_bps:1800,gateway_estimate_bps:0,gateway_tax_bps:1800});expect(r.gateway_estimate_minor).toBe(0);expect(r.seller_before_courier_minor).toBe(194000)})
 test('automatic transfer bounds leave out-of-range settlements for review',()=>{const s={auto_payout:true,status:'scheduled',amount_paise:1000,auto_payout_daily_minor:10000,auto_payout_min_minor:1001};expect(()=>assertAutomaticPayout(s,0)).toThrow('amount range');expect(()=>assertAutomaticPayout({...s,auto_payout_min_minor:0,auto_payout_max_minor:999},0)).toThrow('amount range');expect(()=>assertAutomaticPayout({...s,auto_payout_min_minor:1000,auto_payout_max_minor:1000},0)).not.toThrow()})
+
+test('customer delivery collected offsets the courier bill exactly once',()=>{
+ const o=accountBreakdown({order_id:'o',currency_code:'inr',total_paise:211000,net_paise:204000,platform_fee_paise:1000,customer_shipping_paise:10000,shipping_fee_paise:12000,captured_paise:211000,refunded_paise:0,paid_at:new Date(),payment_mode:'hash_collects',courier_final:true});
+ expect(o).toMatchObject({customer_delivery_minor:10000,commission_minor:6000,courier_fee_minor:12000,settlement_gross_minor:211000,total_deductions_minor:19000,seller_entitlement_minor:192000,settlement_final:true});
+ expect(o.settlement_gross_minor-o.total_deductions_minor).toBe(o.seller_entitlement_minor);
+});
+test('unreconciled courier charges produce provisional earnings held from payout',()=>{
+ const o=accountBreakdown({total_paise:200000,net_paise:194000,captured_paise:200000,paid_at:new Date(),payment_mode:'hash_collects',courier_final:false,payout_block_reason:'Final courier charge must be reconciled before payout',courier_estimate_paise:10000,due:194000});
+ expect(o).toMatchObject({settlement_final:false,courier_estimate_minor:10000,ready_minor:0,held_minor:194000});
+});
+
+test('post-pilot gateway setting preserves Hash funding throughout the pilot',()=>{
+ const v={commission_bps:300,commercial_revision:4,commercial_terms:{enabled:true,pilot_start:'2026-01-01T00:00:00Z',pilot_days:90,pilot_commission_bps:300,regular_commission_bps:800,regular_gateway_payer:'vendor',platform_fee_minor:1000,platform_tax_bps:1800,category_rates:{}}};
+ expect(commercialTerms(v,new Date('2026-02-01')).gateway_payer).toBe('hash');
+ expect(commercialTerms(v,new Date('2026-04-01')).gateway_payer).toBe('vendor');
+ expect(commercialTerms({...v,commercial_terms:{...v.commercial_terms,regular_gateway_payer:undefined}},new Date('2026-04-01')).gateway_payer).toBe('hash');
+});
+test('vendor gateway funding is deducted once from the order snapshot, not current partner terms',()=>{
+ const base={total_paise:201000,net_paise:194000,platform_fee_paise:1000,shipping_fee_paise:10000,captured_paise:201000,paid_at:new Date(),payment_mode:'hash_collects',gateway_fee_paise:4744};
+ const vendor=accountBreakdown({...base,commercial_snapshot:{gateway_payer:'vendor'}});
+ expect(vendor).toMatchObject({gateway_payer:'vendor',vendor_gateway_fee_minor:4744,seller_entitlement_minor:179256,contribution_minor:7000,hash_gateway_cost_minor:0});
+ expect(accountBreakdown(base)).toMatchObject({gateway_payer:'hash',vendor_gateway_fee_minor:0,seller_entitlement_minor:184000,hash_gateway_cost_minor:4744});
+});
