@@ -18,3 +18,8 @@ Example listing excerpt (IDs illustrative):
   ]
 }
 ```
+
+
+The live catalog now includes 22 categories with editable specifications. Fetch the category list dynamically, including the category IDs and definitions. Existing handles such as `mouse` and `controller` are retained. New categories cover headsets, mousepads, microphones, webcams and capture cards, speakers, desks, PC components, laptops and desktops.
+
+Hash Operations can edit field definitions, required fields, filter selection and allowed variant choices in Product categories. These are category definitions. Actual specifications must be entered by the vendor for each product.

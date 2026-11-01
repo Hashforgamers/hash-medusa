@@ -1,0 +1,3257 @@
+[
+  {
+    "handle": "accessories",
+    "name": "Accessories",
+    "description": "Gaming accessories, desk add-ons and peripheral essentials.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "accessory_type",
+        "label": "Accessory type",
+        "type": "select",
+        "choices": [
+          "USB hub",
+          "Cable",
+          "Adapter",
+          "Wrist rest",
+          "Stand",
+          "Cleaning kit",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "compatibility",
+        "label": "Compatibility",
+        "type": "multi",
+        "choices": [
+          "Windows",
+          "macOS",
+          "Linux",
+          "Android"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "material",
+        "label": "Material",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "mouse",
+    "name": "Mouse",
+    "description": "Gaming and everyday mice.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "connectivity",
+        "label": "Connectivity",
+        "type": "multi",
+        "choices": [
+          "Wired",
+          "Bluetooth",
+          "2.4GHz Wireless"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "compatibility",
+        "label": "Compatibility",
+        "type": "multi",
+        "choices": [
+          "Windows",
+          "macOS",
+          "Linux",
+          "Android"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "sensor_type",
+        "label": "Sensor type",
+        "type": "select",
+        "choices": [
+          "Optical",
+          "Laser"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "max_dpi",
+        "label": "Maximum DPI",
+        "type": "number",
+        "choices": [],
+        "unit": "DPI",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "button_count",
+        "label": "Number of buttons",
+        "type": "number",
+        "choices": [],
+        "unit": "buttons",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "hand_orientation",
+        "label": "Hand orientation",
+        "type": "select",
+        "choices": [
+          "Right-handed",
+          "Left-handed",
+          "Ambidextrous"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "polling_rate",
+        "label": "Polling Rate",
+        "type": "select",
+        "choices": [
+          "125Hz",
+          "500Hz",
+          "1000Hz",
+          "8000Hz"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "backlighting",
+        "label": "Backlighting",
+        "type": "select",
+        "choices": [
+          "RGB",
+          "Single Color",
+          "No Backlight"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "battery_capacity",
+        "label": "Battery Capacity",
+        "type": "number",
+        "choices": [],
+        "unit": "mAh",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "monitors",
+    "name": "Monitors",
+    "description": "Gaming monitors and desktop displays.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "screen_size",
+        "label": "Screen size",
+        "type": "number",
+        "choices": [],
+        "unit": "inches",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "resolution",
+        "label": "Resolution",
+        "type": "select",
+        "choices": [
+          "1920 \u00d7 1080",
+          "2560 \u00d7 1440",
+          "3440 \u00d7 1440",
+          "3840 \u00d7 2160",
+          "5120 \u00d7 1440",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "panel_type",
+        "label": "Panel type",
+        "type": "select",
+        "choices": [
+          "IPS",
+          "VA",
+          "TN",
+          "OLED",
+          "QD-OLED",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "refresh_rate",
+        "label": "Refresh rate",
+        "type": "number",
+        "choices": [],
+        "unit": "Hz",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "response_time",
+        "label": "Response time",
+        "type": "number",
+        "choices": [],
+        "unit": "ms",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "curved",
+        "label": "Curved screen",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "display_inputs",
+        "label": "Display inputs",
+        "type": "multi",
+        "choices": [
+          "HDMI",
+          "DisplayPort",
+          "USB-C",
+          "DVI",
+          "VGA"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "adaptive_sync",
+        "label": "Adaptive sync",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "vesa_mount",
+        "label": "VESA mount support",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "chairs",
+    "name": "Chairs",
+    "description": "Gaming and ergonomic chairs.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "chair_type",
+        "label": "Chair type",
+        "type": "select",
+        "choices": [
+          "Gaming",
+          "Ergonomic office",
+          "Recliner"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "upholstery",
+        "label": "Upholstery",
+        "type": "select",
+        "choices": [
+          "Fabric",
+          "Mesh",
+          "PU leather",
+          "Leather",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight_capacity",
+        "label": "Maximum supported weight",
+        "type": "number",
+        "choices": [],
+        "unit": "kg",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "adjustable_armrests",
+        "label": "Adjustable armrests",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "lumbar_support",
+        "label": "Lumbar support",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "headrest",
+        "label": "Headrest",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "recline_angle",
+        "label": "Maximum recline",
+        "type": "number",
+        "choices": [],
+        "unit": "degrees",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "controller",
+    "name": "Controller",
+    "description": "Gamepads and controllers for PC, console and mobile.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "connectivity",
+        "label": "Connectivity",
+        "type": "multi",
+        "choices": [
+          "Wired",
+          "Bluetooth",
+          "2.4GHz Wireless"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "controller_compatibility",
+        "label": "Supported platforms",
+        "type": "multi",
+        "choices": [
+          "PC",
+          "PlayStation 4",
+          "PlayStation 5",
+          "Xbox One",
+          "Xbox Series X/S",
+          "Nintendo Switch",
+          "Android",
+          "iOS",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "controller_type",
+        "label": "Controller type",
+        "type": "select",
+        "choices": [
+          "Gamepad",
+          "Arcade stick",
+          "Racing wheel",
+          "Flight stick",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "hall_effect",
+        "label": "Hall effect sticks",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "vibration",
+        "label": "Vibration feedback",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "remappable_buttons",
+        "label": "Remappable buttons",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "battery_capacity",
+        "label": "Battery Capacity",
+        "type": "number",
+        "choices": [],
+        "unit": "mAh",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "headsets",
+    "name": "Headsets & headphones",
+    "description": "Gaming headsets, headphones and earphones.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "connectivity",
+        "label": "Connectivity",
+        "type": "multi",
+        "choices": [
+          "Wired",
+          "Bluetooth",
+          "2.4GHz Wireless"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "compatibility",
+        "label": "Compatibility",
+        "type": "multi",
+        "choices": [
+          "Windows",
+          "macOS",
+          "Linux",
+          "Android"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "headset_type",
+        "label": "Headset type",
+        "type": "select",
+        "choices": [
+          "Over-ear",
+          "On-ear",
+          "In-ear"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "driver_size",
+        "label": "Driver size",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "microphone",
+        "label": "Built-in microphone",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "detachable_microphone",
+        "label": "Detachable microphone",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "noise_cancellation",
+        "label": "Active noise cancellation",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "audio_channels",
+        "label": "Audio channels",
+        "type": "select",
+        "choices": [
+          "Stereo",
+          "Virtual surround",
+          "Surround"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "battery_life",
+        "label": "Battery life",
+        "type": "number",
+        "choices": [],
+        "unit": "hours",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "mousepads",
+    "name": "Mousepads & desk mats",
+    "description": "Mousepads and extended desk mats.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "mat_size",
+        "label": "Size",
+        "type": "select",
+        "choices": [
+          "Small",
+          "Medium",
+          "Large",
+          "XL",
+          "XXL",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "surface_material",
+        "label": "Surface material",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "mat_width",
+        "label": "Width",
+        "type": "number",
+        "choices": [],
+        "unit": "cm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "mat_length",
+        "label": "Length",
+        "type": "number",
+        "choices": [],
+        "unit": "cm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "mat_thickness",
+        "label": "Thickness",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "stitched_edges",
+        "label": "Stitched edges",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "rgb_lighting",
+        "label": "RGB lighting",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "microphones",
+    "name": "Microphones",
+    "description": "Microphones for streaming, gaming and recording.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "microphone_type",
+        "label": "Microphone type",
+        "type": "select",
+        "choices": [
+          "Condenser",
+          "Dynamic",
+          "Lavalier",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "microphone_connection",
+        "label": "Connection",
+        "type": "multi",
+        "choices": [
+          "USB-A",
+          "USB-C",
+          "XLR",
+          "3.5mm",
+          "Wireless"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "polar_pattern",
+        "label": "Polar pattern",
+        "type": "select",
+        "choices": [
+          "Cardioid",
+          "Omnidirectional",
+          "Bidirectional",
+          "Multi-pattern"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "mute_button",
+        "label": "Mute button",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "stand_included",
+        "label": "Stand included",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "compatibility",
+        "label": "Compatibility",
+        "type": "multi",
+        "choices": [
+          "Windows",
+          "macOS",
+          "Linux",
+          "Android"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "webcams",
+    "name": "Webcams & capture cards",
+    "description": "Cameras and capture devices for streaming.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "device_type",
+        "label": "Device type",
+        "type": "select",
+        "choices": [
+          "Webcam",
+          "Capture card"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "capture_resolution",
+        "label": "Maximum capture resolution",
+        "type": "select",
+        "choices": [
+          "720p",
+          "1080p",
+          "1440p",
+          "4K",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "frame_rate",
+        "label": "Maximum frame rate",
+        "type": "number",
+        "choices": [],
+        "unit": "fps",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "autofocus",
+        "label": "Autofocus",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "privacy_shutter",
+        "label": "Privacy shutter",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "connection",
+        "label": "Connection",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "compatibility",
+        "label": "Compatibility",
+        "type": "multi",
+        "choices": [
+          "Windows",
+          "macOS",
+          "Linux",
+          "Android"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "speakers",
+    "name": "Speakers",
+    "description": "Desktop speakers and soundbars.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "speaker_type",
+        "label": "Speaker type",
+        "type": "select",
+        "choices": [
+          "Desktop speakers",
+          "Soundbar",
+          "Portable speaker"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "speaker_channels",
+        "label": "Speaker channels",
+        "type": "select",
+        "choices": [
+          "2.0",
+          "2.1",
+          "5.1",
+          "7.1",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "power_output",
+        "label": "Rated output",
+        "type": "number",
+        "choices": [],
+        "unit": "W",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "speaker_inputs",
+        "label": "Audio inputs",
+        "type": "multi",
+        "choices": [
+          "3.5mm",
+          "USB",
+          "Bluetooth",
+          "Optical",
+          "HDMI"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "subwoofer",
+        "label": "Subwoofer included",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "gaming-desks",
+    "name": "Gaming desks",
+    "description": "Desks for gaming and workstation setups.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "desk_width",
+        "label": "Width",
+        "type": "number",
+        "choices": [],
+        "unit": "cm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "desk_depth",
+        "label": "Depth",
+        "type": "number",
+        "choices": [],
+        "unit": "cm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "desk_height",
+        "label": "Height",
+        "type": "number",
+        "choices": [],
+        "unit": "cm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "desktop_material",
+        "label": "Desktop material",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "height_adjustable",
+        "label": "Height adjustable",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cable_management",
+        "label": "Cable management",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "load_capacity",
+        "label": "Maximum load",
+        "type": "number",
+        "choices": [],
+        "unit": "kg",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "graphics-cards",
+    "name": "Graphics cards",
+    "description": "Dedicated graphics cards for gaming PCs.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "gpu_chipset",
+        "label": "GPU chipset",
+        "type": "select",
+        "choices": [
+          "NVIDIA",
+          "AMD",
+          "Intel"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "gpu_model",
+        "label": "GPU model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "vram_capacity",
+        "label": "VRAM capacity",
+        "type": "number",
+        "choices": [],
+        "unit": "GB",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "vram_type",
+        "label": "VRAM type",
+        "type": "select",
+        "choices": [
+          "GDDR5",
+          "GDDR6",
+          "GDDR6X",
+          "GDDR7",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "recommended_psu",
+        "label": "Recommended PSU",
+        "type": "number",
+        "choices": [],
+        "unit": "W",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "card_length",
+        "label": "Card length",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "power_connectors",
+        "label": "Power connectors",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "display_outputs",
+        "label": "Display outputs",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "processors",
+    "name": "Processors",
+    "description": "Desktop processors for PC builds.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cpu_manufacturer",
+        "label": "CPU manufacturer",
+        "type": "select",
+        "choices": [
+          "AMD",
+          "Intel"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cpu_series",
+        "label": "CPU series",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cpu_socket",
+        "label": "CPU socket",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "core_count",
+        "label": "Core count",
+        "type": "number",
+        "choices": [],
+        "unit": "cores",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "thread_count",
+        "label": "Thread count",
+        "type": "number",
+        "choices": [],
+        "unit": "threads",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "boost_clock",
+        "label": "Maximum boost clock",
+        "type": "number",
+        "choices": [],
+        "unit": "GHz",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "tdp",
+        "label": "Rated TDP",
+        "type": "number",
+        "choices": [],
+        "unit": "W",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "integrated_graphics",
+        "label": "Integrated graphics",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cooler_included",
+        "label": "Cooler included",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "motherboards",
+    "name": "Motherboards",
+    "description": "Motherboards for desktop PC builds.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cpu_socket",
+        "label": "CPU socket",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "chipset",
+        "label": "Chipset",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "board_size",
+        "label": "Form factor",
+        "type": "select",
+        "choices": [
+          "ATX",
+          "Micro-ATX",
+          "Mini-ITX",
+          "E-ATX",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "memory_type",
+        "label": "Memory type",
+        "type": "select",
+        "choices": [
+          "DDR3",
+          "DDR4",
+          "DDR5"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "memory_slots",
+        "label": "Memory slots",
+        "type": "number",
+        "choices": [],
+        "unit": "slots",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "max_memory",
+        "label": "Maximum memory",
+        "type": "number",
+        "choices": [],
+        "unit": "GB",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "wifi",
+        "label": "Built-in Wi-Fi",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "bluetooth",
+        "label": "Built-in Bluetooth",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "memory",
+    "name": "RAM & memory",
+    "description": "Memory modules and kits.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "memory_type",
+        "label": "Memory type",
+        "type": "select",
+        "choices": [
+          "DDR3",
+          "DDR4",
+          "DDR5"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "memory_capacity",
+        "label": "Kit capacity",
+        "type": "select",
+        "choices": [
+          "8 GB",
+          "16 GB",
+          "24 GB",
+          "32 GB",
+          "48 GB",
+          "64 GB",
+          "96 GB",
+          "128 GB",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "memory_speed",
+        "label": "Memory speed",
+        "type": "number",
+        "choices": [],
+        "unit": "MT/s",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "module_count",
+        "label": "Modules in kit",
+        "type": "number",
+        "choices": [],
+        "unit": "modules",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "memory_form",
+        "label": "Module form",
+        "type": "select",
+        "choices": [
+          "DIMM",
+          "SODIMM"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "latency",
+        "label": "CAS latency",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "rgb_lighting",
+        "label": "RGB lighting",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "storage",
+    "name": "SSDs & hard drives",
+    "description": "Internal and external storage.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "storage_type",
+        "label": "Storage type",
+        "type": "select",
+        "choices": [
+          "NVMe SSD",
+          "SATA SSD",
+          "HDD",
+          "External SSD",
+          "External HDD",
+          "USB flash drive"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "storage_capacity",
+        "label": "Capacity",
+        "type": "select",
+        "choices": [
+          "128 GB",
+          "256 GB",
+          "500 GB",
+          "512 GB",
+          "1 TB",
+          "2 TB",
+          "4 TB",
+          "8 TB",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "storage_interface",
+        "label": "Interface",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "drive_form",
+        "label": "Form factor",
+        "type": "select",
+        "choices": [
+          "M.2 2280",
+          "M.2 2230",
+          "2.5 inch",
+          "3.5 inch",
+          "External",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "read_speed",
+        "label": "Sequential read speed",
+        "type": "number",
+        "choices": [],
+        "unit": "MB/s",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "write_speed",
+        "label": "Sequential write speed",
+        "type": "number",
+        "choices": [],
+        "unit": "MB/s",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "power-supplies",
+    "name": "Power supplies",
+    "description": "Power supplies for desktop PCs.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "wattage",
+        "label": "Rated wattage",
+        "type": "number",
+        "choices": [],
+        "unit": "W",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "efficiency",
+        "label": "Efficiency certification",
+        "type": "select",
+        "choices": [
+          "80 PLUS",
+          "Bronze",
+          "Silver",
+          "Gold",
+          "Platinum",
+          "Titanium",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "modularity",
+        "label": "Cabling",
+        "type": "select",
+        "choices": [
+          "Fully modular",
+          "Semi-modular",
+          "Non-modular"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "psu_form",
+        "label": "Form factor",
+        "type": "select",
+        "choices": [
+          "ATX",
+          "SFX",
+          "SFX-L",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "power_connectors",
+        "label": "Power connectors",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "pc-cases",
+    "name": "PC cases",
+    "description": "Cases for desktop PC builds.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "case_size",
+        "label": "Case size",
+        "type": "select",
+        "choices": [
+          "Full tower",
+          "Mid tower",
+          "Mini tower",
+          "Small form factor",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "board_support",
+        "label": "Supported motherboards",
+        "type": "multi",
+        "choices": [
+          "ATX",
+          "Micro-ATX",
+          "Mini-ITX",
+          "E-ATX",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "gpu_clearance",
+        "label": "Maximum graphics card length",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cooler_clearance",
+        "label": "Maximum CPU cooler height",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "included_fans",
+        "label": "Included fans",
+        "type": "number",
+        "choices": [],
+        "unit": "fans",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "tempered_glass",
+        "label": "Tempered glass panel",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "cooling",
+    "name": "Cooling & fans",
+    "description": "CPU coolers, case fans and thermal accessories.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cooling_type",
+        "label": "Cooling type",
+        "type": "select",
+        "choices": [
+          "Air cooler",
+          "Liquid cooler",
+          "Case fan",
+          "Thermal paste",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "fan_size",
+        "label": "Fan size",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "radiator_size",
+        "label": "Radiator size",
+        "type": "number",
+        "choices": [],
+        "unit": "mm",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "socket_support",
+        "label": "Supported CPU sockets",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "rgb_lighting",
+        "label": "RGB lighting",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "noise_level",
+        "label": "Rated noise level",
+        "type": "number",
+        "choices": [],
+        "unit": "dBA",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "gaming-laptops",
+    "name": "Gaming laptops",
+    "description": "Gaming laptops and portable PCs.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cpu_model",
+        "label": "Processor model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "gpu_model",
+        "label": "GPU model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "installed_memory",
+        "label": "Installed RAM",
+        "type": "number",
+        "choices": [],
+        "unit": "GB",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "installed_storage",
+        "label": "Installed storage",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "screen_size",
+        "label": "Screen size",
+        "type": "number",
+        "choices": [],
+        "unit": "inches",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "refresh_rate",
+        "label": "Refresh rate",
+        "type": "number",
+        "choices": [],
+        "unit": "Hz",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "operating_system",
+        "label": "Operating system",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "battery_capacity_wh",
+        "label": "Battery capacity",
+        "type": "number",
+        "choices": [],
+        "unit": "Wh",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "handle": "gaming-pcs",
+    "name": "Gaming desktops",
+    "description": "Prebuilt gaming desktops.",
+    "specifications": [
+      {
+        "key": "brand",
+        "label": "Brand",
+        "type": "text",
+        "choices": [
+          "Logitech",
+          "Razer",
+          "Redragon",
+          "Cosmic Byte"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": true
+      },
+      {
+        "key": "model",
+        "label": "Model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "color",
+        "label": "Color",
+        "type": "multi",
+        "choices": [
+          "Black",
+          "White",
+          "Grey",
+          "Pink",
+          "Other"
+        ],
+        "unit": "",
+        "filterable": true,
+        "variant": true,
+        "required": false
+      },
+      {
+        "key": "warranty",
+        "label": "Warranty",
+        "type": "select",
+        "choices": [
+          "6 Months",
+          "1 Year",
+          "2 Years",
+          "3 Years"
+        ],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "weight",
+        "label": "Weight",
+        "type": "number",
+        "choices": [],
+        "unit": "g",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "cpu_model",
+        "label": "Processor model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "gpu_model",
+        "label": "GPU model",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "installed_memory",
+        "label": "Installed RAM",
+        "type": "number",
+        "choices": [],
+        "unit": "GB",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "installed_storage",
+        "label": "Installed storage",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "operating_system",
+        "label": "Operating system",
+        "type": "text",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "wattage",
+        "label": "PSU wattage",
+        "type": "number",
+        "choices": [],
+        "unit": "W",
+        "filterable": false,
+        "variant": false,
+        "required": false
+      },
+      {
+        "key": "wifi",
+        "label": "Built-in Wi-Fi",
+        "type": "boolean",
+        "choices": [],
+        "unit": "",
+        "filterable": true,
+        "variant": false,
+        "required": false
+      }
+    ]
+  }
+]
