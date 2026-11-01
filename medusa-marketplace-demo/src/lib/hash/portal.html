@@ -11,6 +11,10 @@ dialog{color:#182d29;border:1px solid #dbe5df;border-radius:16px;padding:28px;wi
 .field-label{display:grid;align-content:start;gap:8px;font-size:12px;font-weight:550;color:#465f52;min-width:0}.multi-select{position:relative;font-weight:400;min-width:0}.multi-select summary{border:1px solid #ccd9d1;border-radius:7px;background:white;padding:11px 30px 11px 12px;min-height:42px;cursor:pointer;list-style:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.multi-select summary::-webkit-details-marker{display:none}.multi-select summary:after{content:'⌄';position:absolute;right:12px;top:9px;font-size:17px}.multi-select[open] summary{border-color:var(--accent)}.multi-popover{position:absolute;top:calc(100% + 6px);left:0;right:0;background:white;border:1px solid #ccd9d1;border-radius:9px;padding:10px;box-shadow:0 12px 32px #163a2929;z-index:8;min-width:220px}.multi-options{max-height:190px;overflow:auto;margin:8px 0}.multi-options label{display:flex;align-items:center;gap:10px;padding:9px 6px;border-radius:5px;font-size:13px;font-weight:400;cursor:pointer}.multi-options label:hover{background:#edf5f0}.multi-options input{width:16px;height:16px;min-height:0;flex-shrink:0;accent-color:var(--accent)}.multi-popover>button{font-size:11px;padding:6px 9px;min-height:30px}.multi-popover input[type=search]{min-height:36px;font-size:12px}
 .price-preview{grid-column:1/-1;border:1px solid #cce0d8;border-radius:12px;padding:20px;background:#f5faf7}.price-preview h3{margin-top:0}.price-preview small{display:block}.multi-select[open]{z-index:5}
 .checkbox-field{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px}.checkbox-field input[type=checkbox]{width:18px;height:18px;min-height:0;padding:0;flex:0 0 18px;accent-color:var(--accent)}
+
+.listing-modal{width:min(1000px,calc(100vw - 32px));background:#f5f8f6;padding:28px}.listing-modal>h2{margin-bottom:8px;padding-bottom:0;border:0}.listing-intro{color:#65786e;font-size:13px;line-height:1.6;margin:0 0 24px}.listing-modal.wide form{display:flex;flex-direction:column;gap:18px}.listing-section{background:white;border:1px solid #dce5df;border-radius:12px;padding:24px;min-width:0}.listing-section>header{display:block;margin:0 0 20px;padding:0;border:0}.listing-section h3{font-size:16px;margin:0 0 6px;padding:0;border:0}.listing-section header p,.section-help{font-size:13px;line-height:1.6;color:#65786e;margin:0 0 16px}.listing-section header p{margin:0}.listing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.listing-grid>.span-full{grid-column:1/-1}.listing-grid .field-label{gap:8px}.listing-grid textarea{min-height:110px}.listing-section input,.listing-section select{min-height:44px}.listing-section input[type=checkbox]{min-height:0}.listing-section input[type=file]{max-width:480px;background:#f6f9f7;font-size:13px}.listing-section input[type=file]::file-selector-button{background:#e7f1eb;color:#19533f;border:0;border-radius:5px;padding:8px 12px;margin-right:12px;cursor:pointer}.listing-section .field-label>div:has(input[type=file]){display:grid;justify-items:start;gap:12px}.listing-section img{background:#f7f9f8;padding:12px;border:1px solid #e4ebe6}.variants-heading{font-size:14px;border-top:1px solid #e5ece7;padding-top:20px;margin:24px 0 8px}.listing-specifications>.checkbox-field{display:inline-flex;border:1px solid #d9e4dc;padding:10px 14px;border-radius:8px;margin:0 10px 12px 0;background:#fafcfb}.variant-card{border:1px solid #dce5df;border-radius:10px;padding:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:16px 0;background:#fafcfb;min-width:0}.variant-card legend{padding:0 8px;color:#245741;font-size:13px;font-weight:650}.variant-card>button{justify-self:start;align-self:end;font-size:12px}.listing-modal .price-preview{margin-top:20px}.listing-modal form>.toolbar{background:#f5f8f6;bottom:-28px;margin:0;padding:18px 0 0;flex-wrap:wrap}.listing-footer-note{margin-right:auto;max-width:360px;font-size:12px;line-height:1.5;color:#65786e}.listing-modal [hidden]{display:none!important}
+@media(max-width:760px){.listing-modal{padding:20px}.listing-section{padding:18px}.listing-grid,.variant-card{grid-template-columns:1fr}.listing-modal form>.toolbar{bottom:-20px}.listing-footer-note{flex-basis:100%;max-width:none}.listing-section input[type=file]{max-width:100%}}
+
 </style></head><body><div id="app"></div><div id="toast" role="status"></div><dialog id="modal"></dialog><script>
 'use strict';
 const API_BASE=window.HASH_BACKEND_URL||'';
@@ -164,7 +168,7 @@ function skuStock(p){
  const f=$('#modal form');f.elements.variant_id.onchange=()=>f.elements.stock.value=rows.find(v=>v.id===f.elements.variant_id.value).stock
 }
 function listingSpecs(form,product){
- const box=el('section',{});form.querySelector('.error').before(box)
+ const box=el('section',{class:'listing-section listing-specifications'});form.querySelector('.error').before(box)
  let values={...product?.specifications},rows=(product?.variants||[]).filter(v=>Object.keys(v.options).length).map(v=>({id:v.id,sku:v.sku,options:{...v.options},price_inr:v.prices.find(x=>x.currency_code==='inr')?.amount,stock:v.stock}))
  const axes=new Set(Object.keys(rows[0]?.options||{}))
  let readFields=()=>({})
@@ -174,19 +178,19 @@ function listingSpecs(form,product){
   for(const c of data.categories.filter(c=>selected.includes(c.id)))for(const d of c.specifications||[])defs.set(d.key,d)
   for(const k of axes)if(!defs.get(k)?.variant)axes.delete(k)
   const readers={}
-  if(defs.size)box.append(el('h3',{},'Product specifications'))
+  box.append(el('h3',{},'3. Specifications & variants'),el('p',{class:'section-help'},defs.size?'Complete the category details. Fields marked * are required.':'Choose a product category in Listing details to see its specifications.'));const specsGrid=el('div',{class:'listing-grid'});box.append(specsGrid)
   for(const d of defs.values()){
    if(axes.has(d.key))continue
    let input,read
    if(d.type==='multi'){input=multiSelectField(field('spec_'+d.key,d.label,'multiselect',values[d.key]||[],d.choices.map(x=>[x,x])));read=()=>Array.from(input.querySelectorAll('input:checked'),x=>x.value)}
    else if(['boolean','select'].includes(d.type)){input=el('select',{},el('option',{value:''},'Select…'),(d.type==='boolean'?['Yes','No']:d.choices).map(v=>el('option',{value:v},v)));input.value=d.type==='boolean'?(values[d.key]==null?'':values[d.key]?'Yes':'No'):values[d.key]||'';read=()=>input.value===''?undefined:d.type==='boolean'?input.value==='Yes':input.value}
    else{input=el('input',{type:d.type==='number'?'number':'text',step:'any',value:values[d.key]??'',placeholder:(d.choices||[]).join(', ')});read=()=>input.value===''?undefined:d.type==='number'?Number(input.value):input.value}
-   readers[d.key]=read;box.append(el('div',{class:'field-label'},d.label+(d.unit?' ('+d.unit+')':'')+(d.required?' *':''),input))
+   readers[d.key]=read;input.id='listing-spec-'+d.key;if(d.type!=='multi')input.required=d.required;specsGrid.append(el('div',{class:'field-label'},el(d.type==='multi'?'span':'label',d.type==='multi'?{}:{for:input.id},d.label+(d.unit?' ('+d.unit+')':'')+(d.required?' *':'')),input))
   }
   readFields=()=>Object.fromEntries(Object.entries(readers).map(([k,fn])=>[k,fn()]))
   const choices=[...defs.values()].filter(d=>d.variant)
   if(choices.length){
-   box.append(el('h3',{},'Purchasable options'),el('p',{},'Select the attributes that distinguish SKUs, then add only combinations you sell. Each SKU uses its own INR price and stock.'))
+   box.append(el('h4',{class:'variants-heading'},'Does this product come in different options?'),el('p',{class:'section-help'},'Choose options such as color or switch type. Add only the combinations you sell, each with its own stock and price.'))
    for(const d of choices){const check=el('input',{type:'checkbox'});check.checked=axes.has(d.key);check.disabled=!!product?.variants?.some(v=>Object.keys(v.options).length);check.onchange=()=>{if(check.checked)axes.add(d.key);else{axes.delete(d.key);rows.forEach(r=>delete r.options[d.key])}draw()};box.append(el('label',{class:'checkbox-field'},check,d.label))}
   }
   const variantMode=axes.size>0
@@ -194,18 +198,41 @@ function listingSpecs(form,product){
   if(!variantMode)return
   const add=()=>({id:!rows.length?product?.variants?.[0]?.id:undefined,sku:'',options:{},price_inr:product?.price_inr||0,stock:!rows.length?product?.stock||0:0})
   if(!rows.length)rows.push(add())
-  for(const r of rows){const group=el('fieldset',{},el('legend',{},'SKU combination'))
-   for(const k of axes){const d=defs.get(k),input=el('select',{},el('option',{value:''},'Choose…'),d.choices.map(v=>el('option',{value:v},v)));input.value=r.options[k]||'';input.onchange=()=>r.options[k]=input.value;group.append(el('label',{},d.label,input))}
-   for(const [k,title] of [['sku','SKU code'],['price_inr','Price (₹)'],['stock','Stock quantity']]){const input=el('input',{type:k==='sku'?'text':'number',min:0,step:k==='price_inr'?'.01':'1',value:r[k]});if(k==='price_inr')input.dataset.skuPrice='true';input.oninput=()=>r[k]=k==='sku'?input.value:Number(input.value);group.append(el('label',{},title,input))}
-   if(!r.id&&rows.length>1)group.append(button('Remove combination',()=>{rows=rows.filter(x=>x!==r);draw()}));box.append(group)
+  for(const r of rows){const group=el('fieldset',{class:'variant-card'},el('legend',{},'Variant '+(rows.indexOf(r)+1)))
+   for(const k of axes){const d=defs.get(k),input=el('select',{},el('option',{value:''},'Choose…'),d.choices.map(v=>el('option',{value:v},v)));input.value=r.options[k]||'';input.onchange=()=>r.options[k]=input.value;input.required=true;group.append(el('label',{},d.label,input))}
+   for(const [k,title] of [['sku','SKU code'],['price_inr','Price (₹)'],['stock','Stock quantity']]){const input=el('input',{type:k==='sku'?'text':'number',min:0,step:k==='price_inr'?'.01':'1',value:r[k]});input.required=true;if(k==='price_inr'){input.min='.01';input.dataset.skuPrice='true';}input.oninput=()=>r[k]=k==='sku'?input.value:Number(input.value);group.append(el('label',{},title,input))}
+   if(!r.id&&rows.length>1)group.append(button('Remove variant',()=>{rows=rows.filter(x=>x!==r);draw()}));box.append(group)
   }
-  box.append(button('Add combination',()=>{rows.push(add());draw()}))
+  box.append(button('Add another variant',()=>{rows.push(add());draw()}))
  }
  form.addEventListener('change',e=>{if(e.target.name==='category_ids'||e.target.querySelector?.('[name=category_ids]'))draw()});draw()
  return ()=>({specifications:Object.fromEntries(Object.entries(readFields()).filter(([,v])=>v!=null&&(!Array.isArray(v)||v.length))),variants:axes.size?rows:[]})
 }
 
-function productForm(p){const vendor=p?.vendor_id||data.actor.vendor_id||data.vendors[0]?.id;if(!vendor)return toast('Onboard a vendor first');form(p?'Edit product or service':'Add product or service',[field('product_details','Product details','heading'),field('vendor_id','Vendor','select',vendor,data.vendors.map(v=>[v.id,v.name])),field('title','Product / service name','text',p?.title||''),field('description','Description','textarea',p?.description||''),field('category_ids','Product categories · select one or more','multiselect',(p?.categories||[]).map(c=>c.id),(data.categories||[]).map(c=>[c.id,c.name])),field('kind','Type','select',p?.kind||'service',[['service','Service'],['product','Physical product']]),field('pricing_heading','Pricing & availability','heading'),field('prices','Prices by currency','prices',p?.prices||[]),field('stock','Available quantity / service slots','number',p?.stock||0),field('package_heading','Packed unit dimensions · used to book delivery','heading'),field('weight_g','Packed unit weight (grams; physical products)','number',p?.shipping_package?.weight_g||''),field('length_cm','Packed unit length (cm)','number',p?.shipping_package?.length_cm||''),field('width_cm','Packed unit width (cm)','number',p?.shipping_package?.width_cm||''),field('height_cm','Packed unit height (cm)','number',p?.shipping_package?.height_cm||''),field('image_heading','Product image','heading'),field('thumbnail','Upload product image','image',p?.thumbnail||'')],async b=>{const {weight_g,length_cm,width_cm,height_cm,...listing}=b;const shipping_package=b.kind==='product'&&[weight_g,length_cm,width_cm,height_cm].some(Boolean)?{weight_g,length_cm,width_cm,height_cm}:null;const attributes=readSpecs();if(attributes.variants.length)delete listing.prices;await act({action:'save_product',...(p?{product_id:p.product_id}:{}),...listing,...attributes,shipping_package});toast('Product submitted for Hash approval')},'Submit for approval');const f=$('#modal form'),packageHeading=[...f.querySelectorAll('h3')].find(h=>h.textContent.startsWith('Packed unit dimensions'));const showPackage=()=>{const hidden=f.elements.kind.value!=='product';if(packageHeading)packageHeading.hidden=hidden;for(const k of ['weight_g','length_cm','width_cm','height_cm'])f.elements[k].closest('label').hidden=hidden};f.elements.kind.addEventListener('change',showPackage);showPackage();const readSpecs=listingSpecs(f,p);attachPricePreview(f)}
+function styleListingForm(f){
+ const modal=$('#modal');modal.classList.add('listing-modal')
+ modal.querySelector('h2').after(el('p',{class:'listing-intro'},'Add the details customers need to choose your product. Submit the completed listing for Hash approval.'))
+ const section=(title,note,fields)=>{
+  const card=el('section',{class:'listing-section'},el('header',{},el('h3',{},title),el('p',{},note))),grid=el('div',{class:'listing-grid'})
+  for(const name of fields){const control=f.querySelector('[name="'+name+'"]');const wrapper=name==='category_ids'?control?.closest('.field-label'):control?.closest('label,.field-label');if(wrapper){if(['title','description','category_ids','thumbnail','prices'].includes(name))wrapper.classList.add('span-full');grid.append(wrapper)}}
+  card.append(grid);return card
+ }
+ const details=section('1. Listing details','Choose a category to load the relevant specifications.',['vendor_id','kind','title','category_ids','description'])
+ const media=section('2. Product image','Use a clear photo of the product. Your image uploads automatically.',['thumbnail'])
+ const specifications=f.querySelector('.listing-specifications')
+ const pricing=section('4. Price & stock','For products with variants, enter the price and quantity for each combination above.',['prices','stock'])
+ const preview=f.querySelector('.price-preview');if(preview)pricing.append(preview)
+ const packing=section('5. Packed dimensions','Measure one packed unit, including its outer packaging. These details are used for courier booking.',['weight_g','length_cm','width_cm','height_cm'])
+ for(const heading of [...f.children].filter(n=>n.tagName==='H3'))heading.remove()
+ const error=f.querySelector('.error');error.before(details,media,specifications,pricing,packing)
+ const toggle=()=>packing.hidden=f.elements.kind.value!=='product';f.elements.kind.addEventListener('change',toggle);toggle()
+ f.elements.title.required=true;f.elements.title.placeholder='e.g. Logitech G203 gaming mouse'
+ f.elements.description.placeholder='Describe the product, what is included, and anything customers should know.'
+ f.elements.stock.step='1'
+ f.querySelector('.toolbar').prepend(el('span',{class:'listing-footer-note'},'Your listing will be reviewed before it appears in the shop.'))
+}
+
+function productForm(p){const vendor=p?.vendor_id||data.actor.vendor_id||data.vendors[0]?.id;if(!vendor)return toast('Onboard a vendor first');form(p?'Edit product or service':'Add product or service',[field('product_details','Product details','heading'),field('vendor_id','Vendor','select',vendor,data.vendors.map(v=>[v.id,v.name])),field('title','Product / service name','text',p?.title||''),field('description','Description','textarea',p?.description||''),field('category_ids','Product categories · select one or more','multiselect',(p?.categories||[]).map(c=>c.id),(data.categories||[]).map(c=>[c.id,c.name])),field('kind','Type','select',p?.kind||'service',[['service','Service'],['product','Physical product']]),field('pricing_heading','Pricing & availability','heading'),field('prices','Prices by currency','prices',p?.prices||[]),field('stock','Available quantity / service slots','number',p?.stock||0),field('package_heading','Packed unit dimensions · used to book delivery','heading'),field('weight_g','Packed weight (g)','number',p?.shipping_package?.weight_g||''),field('length_cm','Length (cm)','number',p?.shipping_package?.length_cm||''),field('width_cm','Width (cm)','number',p?.shipping_package?.width_cm||''),field('height_cm','Height (cm)','number',p?.shipping_package?.height_cm||''),field('image_heading','Product image','heading'),field('thumbnail','Upload product image','image',p?.thumbnail||'')],async b=>{const {weight_g,length_cm,width_cm,height_cm,...listing}=b;const shipping_package=b.kind==='product'&&[weight_g,length_cm,width_cm,height_cm].some(Boolean)?{weight_g,length_cm,width_cm,height_cm}:null;const attributes=readSpecs();if(attributes.variants.length)delete listing.prices;await act({action:'save_product',...(p?{product_id:p.product_id}:{}),...listing,...attributes,shipping_package});toast('Product submitted for Hash approval')},'Submit for approval');const f=$('#modal form'),packageHeading=[...f.querySelectorAll('h3')].find(h=>h.textContent.startsWith('Packed unit dimensions'));const showPackage=()=>{const hidden=f.elements.kind.value!=='product';if(packageHeading)packageHeading.hidden=hidden;for(const k of ['weight_g','length_cm','width_cm','height_cm'])f.elements[k].closest('label').hidden=hidden};f.elements.kind.addEventListener('change',showPackage);showPackage();const readSpecs=listingSpecs(f,p);attachPricePreview(f);styleListingForm(f)}
 const pageInfo={
  'Overview':['Dashboard','A clear view of your products, orders and earnings.','home'],
  'Partners':['Partner businesses','Onboard partners and manage business details, bank accounts and access.','business'],
