@@ -159,24 +159,37 @@ document.addEventListener('click',e=>document.querySelectorAll('.multi-select[op
 function field(name,label,type='text',value='',options){return{name,label,type,value,options}}
 function form(title,fields,submit,label='Save'){const m=$('#modal');m.replaceChildren();m.className=fields.length>=8?'wide':'';const error=el('div',{class:'error',role:'alert',tabindex:'-1'}),f=el('form',{});for(const x of fields){if(x.type==='heading'){f.append(el(x.name.includes('notice')||x.label.length>120?'p':'h3',{class:x.name.includes('notice')||x.label.length>120?'form-guidance':'form-heading'},x.label));continue}let input;if(x.type==='state'){input=el('select',{name:x.name});queueMicrotask(()=>bindStateField(input,x,f))}else if(x.type==='mapping'){input=mappingField(x)}else if(x.type==='categoryrates'){input=categoryRatesField(x)}else if(x.type==='prices'){input=pricesField(x)}else if(x.type==='multiselect'){input=multiSelectField(x)}else if(x.type==='select'){input=el('select',{name:x.name},x.options.map(o=>el('option',{value:o[0]},o[1])));input.value=x.value}else if(x.type==='image'){input=imageField(x,f)}else if(x.type==='textarea'){input=el('textarea',{name:x.name});input.value=x.value}else{input=el('input',{name:x.name,type:x.type,value:x.value,...(x.type==='number'?{step:'any',min:'0'}:{})});if(x.type!=='password')input.autocomplete='off'}const grouped=['multiselect','image'].includes(x.type),wide=['textarea','multiselect','image','mapping','categoryrates','prices'].includes(x.type);f.append(el(grouped?'div':'label',{class:[grouped?'field-label':'',wide?'form-full':''].filter(Boolean).join(' ')},grouped?el('span',{},x.label):x.label,input))}const save=el('button',{type:'submit',class:'primary'},label);f.append(error,el('div',{class:'toolbar'},button('Cancel',()=>m.close()),save));f.addEventListener('submit',async e=>{e.preventDefault();save.disabled=true;error.textContent='';const b=Object.fromEntries(new FormData(f));for(const x of fields){if(x.type==='number')b[x.name]=Number(b[x.name]);if(x.type==='multiselect')b[x.name]=new FormData(f).getAll(x.name);if(x.type==='prices'||x.type==='mapping'||x.type==='categoryrates')b[x.name]=JSON.parse(b[x.name]);}try{await submit(b);m.close()}catch(e){error.textContent=e.message;error.focus();error.scrollIntoView({block:'nearest'})}finally{save.disabled=false}});m.setAttribute('aria-labelledby','dialog-title');m.append(el('h2',{id:'dialog-title'},title),f);m.showModal()}
 function imageField(x,f){
- const value=el('input',{name:x.name,type:'hidden',value:x.value||''});
- const preview=el('img',{alt:'Listing image preview',style:'max-width:100%;max-height:180px;object-fit:contain;border-radius:8px'});
- if(x.value)preview.src=x.value;else preview.hidden=true;
- const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp','aria-label':'Choose listing image'});
- const status=el('span',{role:'status',class:'muted'},'JPEG, PNG or WebP · up to 5 MB');
- const upload=button('Retry image upload',async()=>{
-  const selected=file.files[0];if(!selected){status.textContent='Choose an image first';return}
-  if(!['image/jpeg','image/png','image/webp'].includes(selected.type)||selected.size>5*1024*1024){status.textContent='Choose a JPEG, PNG or WebP up to 5 MB';return}
-  const save=f.querySelector('button[type=submit]');save.disabled=true;upload.disabled=true;file.disabled=true;status.textContent='Uploading image…';
-  try{
-   const data_url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Unable to read image'));reader.readAsDataURL(selected)});
+ const photos=(x.value||[]).map(photo=>({...photo}));
+ const value=el('input',{name:x.name,type:'hidden'}),list=el('div',{class:'listing-grid'}),status=el('p',{role:'status',class:'section-help'});
+ const file=el('input',{type:'file',multiple:'',accept:'image/jpeg,image/png,image/webp','aria-label':'Add product photos'});
+ function draw(){
+  value.value=JSON.stringify(photos);list.replaceChildren();
+  photos.forEach((photo,index)=>{
+   const select=el('select',{'aria-label':'Color for photo '+(index+1)});
+   function choices(){select.replaceChildren(el('option',{value:''},'All colors'),[...new Set([...(f.galleryColors?.()||[]),photo.color].filter(Boolean))].map(c=>el('option',{value:c},c)));select.value=photo.color||''}
+   choices();select.onfocus=choices;select.onchange=()=>{photo.color=select.value||null;value.value=JSON.stringify(photos)};
+   const card=el('div',{class:'variant-card'},el('strong',{},index===0?'Cover photo':'Photo '+(index+1)),el('img',{src:photo.url,alt:'Product photo '+(index+1),style:'display:block;width:100%;height:120px;object-fit:contain'}),el('label',{},'Show for',select));
+   if(index)card.append(button('Make cover',()=>{photos.splice(index,1);photos.unshift(photo);draw()}));
+   card.append(button('Remove photo',()=>{photos.splice(index,1);draw()}));list.append(card)
+  })
+ }
+ f.refreshGallery=draw;draw();
+ file.onchange=async()=>{
+  const files=[...file.files];file.value='';if(!files.length)return;
+  if(photos.length+files.length>30){status.textContent='Choose up to 30 photos per listing.';return}
+  if(files.some(i=>!['image/jpeg','image/png','image/webp'].includes(i.type)||i.size>5*1024*1024)){status.textContent='Choose JPEG, PNG or WebP files up to 5 MB each.';return}
+  const save=f.querySelector('button[type=submit]');file.disabled=true;save.disabled=true;
+  try{for(const [i,item] of files.entries()){
+   status.textContent='Uploading '+(i+1)+' of '+files.length+'…';
+   const data_url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Unable to read '+item.name));reader.readAsDataURL(item)});
    const {image}=await api('/admin/hash/images','POST',{vendor_id:f.elements.vendor_id.value,data_url});
-   value.value=image.url;preview.src=image.url;preview.hidden=false;file.value='';status.textContent='Image ready. Save the listing when your details are complete.';upload.hidden=true;
-  }catch(e){status.textContent='Image upload failed: '+e.message;upload.hidden=false}finally{save.disabled=!!file.files.length;upload.disabled=false;file.disabled=false}
- });
- upload.hidden=true;file.addEventListener('change',()=>{if(file.files[0])upload.click();else{status.textContent='JPEG, PNG or WebP · up to 5 MB';f.querySelector('button[type=submit]').disabled=false}});
- f.addEventListener('submit',e=>{if(file.files.length){e.preventDefault();e.stopImmediatePropagation();status.textContent='Wait for the image upload to finish, or retry the failed upload.'}},true);
- return el('div',{},value,preview,file,upload,status);
+   photos.push({url:image.url,color:null});draw()
+  }status.textContent='Photos ready. Submit your listing to save them.'}
+  catch(e){status.textContent='Upload stopped. Completed photos are shown above. Select the remaining files to retry. '+e.message}
+  finally{file.disabled=false;save.disabled=false}
+ };
+ f.addEventListener('submit',e=>{if(file.disabled){e.preventDefault();e.stopImmediatePropagation()}},true);
+ return el('div',{},value,list,file,status)
 }
 function credentials(r){setTimeout(()=>{const m=$('#modal');m.replaceChildren(el('h2',{},'Account created'),el('p',{},'Copy these credentials now and share them privately. The user must change the temporary password on first use.'),el('pre',{},'Portal: '+location.origin+'/hash-portal\nEmail: '+r.email+'\nTemporary password: '+r.temporary_password),button('Done',()=>m.close(),true));m.showModal()},30)}
 function password(){form('Change your password',[field('current_password','Current password','password'),field('new_password','New password — at least 12 characters','password')],async b=>{await act({action:'change_password',...b});toast('Password changed')},'Update password')}
@@ -291,11 +304,11 @@ function styleListingForm(f){
  modal.querySelector('h2').after(el('p',{class:'listing-intro'},'Add the details customers need to choose your product. Submit the completed listing for Hash approval.'))
  const section=(title,note,fields)=>{
   const card=el('section',{class:'listing-section'},el('header',{},el('h3',{},title),el('p',{},note))),grid=el('div',{class:'listing-grid'})
-  for(const name of fields){const control=f.querySelector('[name="'+name+'"]');const wrapper=name==='category_ids'?control?.closest('.field-label'):control?.closest('label,.field-label');if(wrapper){if(['title','description','category_ids','thumbnail','prices'].includes(name))wrapper.classList.add('span-full');grid.append(wrapper)}}
+  for(const name of fields){const control=f.querySelector('[name="'+name+'"]');const wrapper=name==='category_ids'?control?.closest('.field-label'):control?.closest('label,.field-label');if(wrapper){if(['title','description','category_ids','gallery','prices'].includes(name))wrapper.classList.add('span-full');grid.append(wrapper)}}
   card.append(grid);return card
  }
  const details=section('1. Listing details','Choose a category to load the relevant specifications.',['vendor_id','kind','title','category_ids','description'])
- const media=section('2. Product image','Use a clear photo of the product. Your image uploads automatically.',['thumbnail'])
+ const media=section('2. Product photos','Add JPEG, PNG or WebP photos up to 5 MB each. The cover appears on product cards. Choose a color in Specifications & variants to assign photos to it.',['gallery'])
  const specifications=f.querySelector('.listing-specifications')
  const pricing=section('4. Price & stock','For products with variants, enter the price and quantity for each combination above.',['prices','stock'])
  const preview=f.querySelector('.price-preview');if(preview)pricing.append(preview)
@@ -309,7 +322,7 @@ function styleListingForm(f){
  f.querySelector('.toolbar').prepend(el('span',{class:'listing-footer-note'},'Your listing will be reviewed before it appears in the shop.'))
 }
 
-function productForm(p){const vendor=p?.vendor_id||data.actor.vendor_id||data.vendors[0]?.id;if(!vendor)return toast('Onboard a vendor first');form(p?'Edit product or service':'Add product or service',[field('product_details','Product details','heading'),field('vendor_id','Vendor','select',vendor,data.vendors.map(v=>[v.id,v.name])),field('title','Product / service name','text',p?.title||''),field('description','Description','textarea',p?.description||''),field('category_ids','Product categories · select one or more','multiselect',(p?.categories||[]).map(c=>c.id),(data.categories||[]).map(c=>[c.id,c.name])),field('kind','Type','select',p?.kind||'service',[['service','Service'],['product','Physical product']]),field('pricing_heading','Pricing & availability','heading'),field('prices','Prices by currency','prices',p?.prices||[]),field('stock','Available quantity / service slots','number',p?.stock||0),field('package_heading','Packed unit dimensions · used to book delivery','heading'),field('weight_g','Packed weight (g)','number',p?.shipping_package?.weight_g||''),field('length_cm','Length (cm)','number',p?.shipping_package?.length_cm||''),field('width_cm','Width (cm)','number',p?.shipping_package?.width_cm||''),field('height_cm','Height (cm)','number',p?.shipping_package?.height_cm||''),field('image_heading','Product image','heading'),field('thumbnail','Upload product image','image',p?.thumbnail||'')],async b=>{const {weight_g,length_cm,width_cm,height_cm,...listing}=b;const shipping_package=b.kind==='product'&&[weight_g,length_cm,width_cm,height_cm].some(Boolean)?{weight_g,length_cm,width_cm,height_cm}:null;const attributes=readSpecs();if(attributes.variants.length)delete listing.prices;await act({action:'save_product',...(p?{product_id:p.product_id}:{}),...listing,...attributes,shipping_package});toast('Product submitted for Hash approval')},'Submit for approval');const f=$('#modal form'),packageHeading=[...f.querySelectorAll('h3')].find(h=>h.textContent.startsWith('Packed unit dimensions'));const showPackage=()=>{const hidden=f.elements.kind.value!=='product';if(packageHeading)packageHeading.hidden=hidden;for(const k of ['weight_g','length_cm','width_cm','height_cm'])f.elements[k].closest('label').hidden=hidden};f.elements.kind.addEventListener('change',showPackage);showPackage();const readSpecs=listingSpecs(f,p);attachPricePreview(f);styleListingForm(f)}
+function productForm(p){const vendor=p?.vendor_id||data.actor.vendor_id||data.vendors[0]?.id;if(!vendor)return toast('Onboard a vendor first');form(p?'Edit product or service':'Add product or service',[field('product_details','Product details','heading'),field('vendor_id','Vendor','select',vendor,data.vendors.map(v=>[v.id,v.name])),field('title','Product / service name','text',p?.title||''),field('description','Description','textarea',p?.description||''),field('category_ids','Product categories · select one or more','multiselect',(p?.categories||[]).map(c=>c.id),(data.categories||[]).map(c=>[c.id,c.name])),field('kind','Type','select',p?.kind||'service',[['service','Service'],['product','Physical product']]),field('pricing_heading','Pricing & availability','heading'),field('prices','Prices by currency','prices',p?.prices||[]),field('stock','Available quantity / service slots','number',p?.stock||0),field('package_heading','Packed unit dimensions · used to book delivery','heading'),field('weight_g','Packed weight (g)','number',p?.shipping_package?.weight_g||''),field('length_cm','Length (cm)','number',p?.shipping_package?.length_cm||''),field('width_cm','Width (cm)','number',p?.shipping_package?.width_cm||''),field('height_cm','Height (cm)','number',p?.shipping_package?.height_cm||''),field('image_heading','Product image','heading'),field('gallery','Listing gallery','image',p?.gallery||(p?.thumbnail?[{url:p.thumbnail,color:null}]:[]))],async b=>{const {weight_g,length_cm,width_cm,height_cm,...listing}=b;const shipping_package=b.kind==='product'&&[weight_g,length_cm,width_cm,height_cm].some(Boolean)?{weight_g,length_cm,width_cm,height_cm}:null;listing.gallery=JSON.parse(listing.gallery);const attributes=readSpecs();if(attributes.variants.length)delete listing.prices;await act({action:'save_product',...(p?{product_id:p.product_id}:{}),...listing,...attributes,shipping_package});toast('Product submitted for Hash approval')},'Submit for approval');const f=$('#modal form'),packageHeading=[...f.querySelectorAll('h3')].find(h=>h.textContent.startsWith('Packed unit dimensions'));const showPackage=()=>{const hidden=f.elements.kind.value!=='product';if(packageHeading)packageHeading.hidden=hidden;for(const k of ['weight_g','length_cm','width_cm','height_cm'])f.elements[k].closest('label').hidden=hidden};f.elements.kind.addEventListener('change',showPackage);showPackage();const readSpecs=listingSpecs(f,p);f.galleryColors=()=>{const {specifications,variants}=readSpecs();return [...[specifications.color].flat(),...variants.map(v=>v.options.color)].filter(Boolean)};f.refreshGallery();attachPricePreview(f);styleListingForm(f)}
 const pageInfo={
  'Overview':['Dashboard','A clear view of your products, orders and earnings.','home'],
  'Partners':['Partner businesses','Onboard partners and manage business details, bank accounts and access.','business'],

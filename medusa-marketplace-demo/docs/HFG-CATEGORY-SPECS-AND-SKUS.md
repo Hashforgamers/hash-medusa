@@ -23,3 +23,31 @@ Example listing excerpt (IDs illustrative):
 The live catalog now includes 22 categories with editable specifications. Fetch the category list dynamically, including the category IDs and definitions. Existing handles such as `mouse` and `controller` are retained. New categories cover headsets, mousepads, microphones, webcams and capture cards, speakers, desks, PC components, laptops and desktops.
 
 Hash Operations can edit field definitions, required fields, filter selection and allowed variant choices in Product categories. These are category definitions. Actual specifications must be entered by the vendor for each product.
+
+## Product and color photos
+
+Fetch `GET /store/hash/products?currency_code=inr` with the existing `x-publishable-api-key` header. Two additive response fields provide HTTPS image URLs ready to display. No extra image request or Cloudinary credentials are needed by the app.
+
+```json
+{
+  "thumbnail": "https://res.cloudinary.com/example/image/upload/mouse-front.jpg",
+  "gallery": [
+    {"url":"https://res.cloudinary.com/example/image/upload/mouse-front.jpg","color":null},
+    {"url":"https://res.cloudinary.com/example/image/upload/mouse-white.jpg","color":"White"}
+  ],
+  "variants": [{
+    "id":"variant_white",
+    "options":{"color":"White"},
+    "images":[
+      "https://res.cloudinary.com/example/image/upload/mouse-white.jpg",
+      "https://res.cloudinary.com/example/image/upload/mouse-front.jpg"
+    ]
+  }]
+}
+```
+
+- **Product card:** keep using `thumbnail`. The vendor selects the cover. Show a placeholder when absent.
+- **Product detail:** display `gallery[].url` in order before a selection. A null color means a shared photo.
+- **SKU selection:** replace the carousel with the chosen variant’s `images` and reset the carousel to the first photo. The API orders matching color photos first, followed by shared photos. If neither exists, it returns the listing gallery. Handle an empty array with a placeholder.
+- **Color selection before a SKU is chosen:** match `gallery[].color` exactly to the selected value, append shared photos, and fall back to the full gallery if both groups are empty.
+- **Legacy responses or cached data:** fall back to the product thumbnail when gallery fields are missing. Cart requests still use the selected variant ID.

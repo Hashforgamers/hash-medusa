@@ -91,7 +91,10 @@ export async function saveProduct(container: any,a: any,b: any) {
     const options=Object.keys(nativeRows[0]?.options||{}).map(title=>({title,values:[...new Set<string>(nativeRows.map(r=>r.options[title]))]}))
     if(rows.length&&old&&old.options.some(o=>!options.some(n=>n.title===o.title)))fail("Keep this listing's existing SKU option names")
     if(rows.length&&!configuredStore.supported_currencies.some(c=>c.currency_code==='inr'))fail("Enable INR before listing these SKUs")
-    const metadata={...old?.metadata,hash_specs:specs}
+    const colors=new Set([...rows.map(r=>r.options.color), ...[specs.color].flat()])
+    if(b.gallery?.some(photo=>photo.color&&!colors.has(photo.color)))fail("Assign each photo to a listed color or choose All colors.")
+    const metadata={...old?.metadata,hash_specs:specs,...(b.gallery!==undefined?{hash_gallery:b.gallery}:{})}
+    const cover=metadata.hash_gallery?.[0]?.url ?? (b.gallery!==undefined?"":b.thumbnail)
     if (productId) {
       const { rows:[listing] } = await c.query("SELECT * FROM hash_listing WHERE product_id=$1",[productId])
       if (!listing || listing.vendor_id !== b.vendor_id) fail("Product not found")
@@ -99,7 +102,7 @@ export async function saveProduct(container: any,a: any,b: any) {
       // Unpublish before editing. A failed edit stays safely unpublished and pending.
       await container.resolve(Modules.PRODUCT).updateProducts(productId,{status:"draft"})
       await c.query("UPDATE hash_listing SET approval='pending',review_note='',updated_at=now() WHERE product_id=$1",[productId])
-      await catalogService.updateProducts(productId,{metadata,...(category_ids!==undefined?{category_ids}:{}),title:b.title,description:b.description,thumbnail:b.thumbnail || null,status:"draft"})
+      await catalogService.updateProducts(productId,{metadata,...(category_ids!==undefined?{category_ids}:{}),title:b.title,description:b.description,thumbnail:cover || null,status:"draft"})
       if(rows.length){
         for(const opt of options){
           const prior=old.options.find(o=>o.title===opt.title)
@@ -114,7 +117,7 @@ export async function saveProduct(container: any,a: any,b: any) {
       }else await updateProductVariantsWorkflow(container).run({input:{product_variants:[{id:previous[0].id,prices}]}})
     } else {
       const {result} = await createProductsWorkflow(container).run({input:{products:[{
-        metadata,category_ids:category_ids||[],title:b.title,description:b.description,thumbnail:b.thumbnail || undefined,status:"draft",shipping_profile_id:profile.id,
+        metadata,category_ids:category_ids||[],title:b.title,description:b.description,thumbnail:cover || undefined,status:"draft",shipping_profile_id:profile.id,
         handle:`${b.title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,60)}-${randomBytes(4).toString("hex")}`,
         options:rows.length?options:[{title:"Option",values:["Standard"]}],sales_channels:[{id:store.default_sales_channel_id}],
         variants:rows.length?nativeRows:[{title:"Standard",options:{Option:"Standard"},manage_inventory:true,allow_backorder:false,prices}]
@@ -167,11 +170,16 @@ export async function catalog(container: any, vendorId?: string, publicOnly=fals
     const p = data.find((p: any)=>p.id===r.product_id)
     if (!p || (publicOnly && p.status !== "published")) return []
     const variant = p.variants[0],levels = variant?.inventory_items?.flatMap((i: any)=>i.inventory?.location_levels || []) || []
+    const gallery: {url:string,color:string|null}[]=p.metadata?.hash_gallery ?? (p.thumbnail?[{url:p.thumbnail,color:null}]:[])
     const variants=p.variants.map(v=>{
       const levels=v.inventory_items?.flatMap(i=>i.inventory?.location_levels||[])||[]
-      return {id:v.id,sku:v.sku,title:v.title,options:v.metadata?.hash_options||{},prices:(v.prices||[]).filter(x=>!x.price_list_id&&!x.min_quantity&&!x.max_quantity).map(x=>({currency_code:x.currency_code,amount:x.amount})),stock:levels.reduce((n,l)=>n+Number(l.stocked_quantity),0),available:levels.reduce((n,l)=>n+Number(l.stocked_quantity)-Number(l.reserved_quantity),0)}
+      const color=v.metadata?.hash_options?.color
+      const matching=gallery.filter(photo=>color&&photo.color===color)
+      const shared=gallery.filter(photo=>!photo.color)
+      const images=(matching.length||shared.length?[...matching,...shared]:gallery).map(photo=>photo.url)
+      return {images,id:v.id,sku:v.sku,title:v.title,options:v.metadata?.hash_options||{},prices:(v.prices||[]).filter(x=>!x.price_list_id&&!x.min_quantity&&!x.max_quantity).map(x=>({currency_code:x.currency_code,amount:x.amount})),stock:levels.reduce((n,l)=>n+Number(l.stocked_quantity),0),available:levels.reduce((n,l)=>n+Number(l.stocked_quantity)-Number(l.reserved_quantity),0)}
     })
-    return [{...r,specifications:p.metadata?.hash_specs||{},variants,categories:(p.categories||[]).filter(c=>c.is_active&&!c.is_internal).map(({id,name,handle})=>({id,name,handle})),title:p.title,description:p.description,thumbnail:p.thumbnail,status:p.status,variant_id:variant?.id,
+    return [{...r,gallery,specifications:p.metadata?.hash_specs||{},variants,categories:(p.categories||[]).filter(c=>c.is_active&&!c.is_internal).map(({id,name,handle})=>({id,name,handle})),title:p.title,description:p.description,thumbnail:p.thumbnail,status:p.status,variant_id:variant?.id,
       prices:(variant?.prices||[]).filter((p:any)=>!p.price_list_id&&!p.min_quantity&&!p.max_quantity).map((p:any)=>({currency_code:p.currency_code,amount:p.amount})),
       price_inr:variant?.prices?.find((p:any)=>p.currency_code==="inr")?.amount,
       stock:levels.reduce((n:number,l:any)=>n+Number(l.stocked_quantity || 0),0),
