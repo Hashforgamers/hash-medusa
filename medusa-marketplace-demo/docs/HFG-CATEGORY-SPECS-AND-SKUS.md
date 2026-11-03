@@ -51,3 +51,7 @@ Fetch `GET /store/hash/products?currency_code=inr` with the existing `x-publisha
 - **SKU selection:** replace the carousel with the chosen variant’s `images` and reset the carousel to the first photo. The API orders matching color photos first, followed by shared photos. If neither exists, it returns the listing gallery. Handle an empty array with a placeholder.
 - **Color selection before a SKU is chosen:** match `gallery[].color` exactly to the selected value, append shared photos, and fall back to the full gallery if both groups are empty.
 - **Legacy responses or cached data:** fall back to the product thumbnail when gallery fields are missing. Cart requests still use the selected variant ID.
+
+### Custom color names
+
+For a color definition, `GET /store/hash/categories` returns `allow_custom: true` and a `suggestions` array. Suggestions include the category's own choices and the shared palette. Vendors can also enter a shade such as “Arctic Blue / Pearl”. In the app, build purchasable swatches from actual `variants[].options.color`. Show the exact name even when it has no known swatch or hex code. Use that same string for gallery matching and the existing category filter. Shared, non-SKU colors remain in `specifications.color`.

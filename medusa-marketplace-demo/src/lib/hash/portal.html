@@ -257,6 +257,18 @@ function skuStock(p){
  const rows=p.variants;form('Update SKU stock',[field('variant_id','SKU','select',rows[0].id,rows.map(v=>[v.id,v.title+' · '+v.sku])),field('stock','Stock including reserved units','number',rows[0].stock)],b=>act({action:'stock',product_id:p.product_id,...b}))
  const f=$('#modal form');f.elements.variant_id.onchange=()=>f.elements.stock.value=rows.find(v=>v.id===f.elements.variant_id.value).stock
 }
+function colorInput(d,value){
+ const id='color-'+crypto.randomUUID(),input=el('input',{type:'text',list:id,maxlength:100,value:value||'',placeholder:'Choose or type a shade', 'aria-label':'Color'});
+ const list=el('datalist',{id},(d.suggestions||d.choices).map(color=>el('option',{value:color})));
+ return {input,box:el('div',{},input,list)}
+}
+function colorList(d,initial){
+ const selected=new Set(initial||[]),chips=el('div',{class:'toolbar'}),{input,box}=colorInput(d,'');
+ function draw(){chips.replaceChildren(...[...selected].map(c=>button('Remove '+c,()=>{selected.delete(c);draw()})))}
+ function add(){const v=input.value.trim();if(v)selected.add(v);input.value='';draw()}
+ input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add()}};
+ draw();return {box:el('div',{},box,button('Add color',add),chips),read:()=>[...new Set([...selected,input.value.trim()].filter(Boolean))]}
+}
 function listingSpecs(form,product){
  const box=el('section',{class:'listing-section listing-specifications'});form.querySelector('.error').before(box)
  let values={...product?.specifications},rows=(product?.variants||[]).filter(v=>Object.keys(v.options).length).map(v=>({id:v.id,sku:v.sku,options:{...v.options},price_inr:v.prices.find(x=>x.currency_code==='inr')?.amount,stock:v.stock}))
@@ -272,7 +284,9 @@ function listingSpecs(form,product){
   for(const d of defs.values()){
    if(axes.has(d.key))continue
    let input,read
-   if(d.type==='multi'){input=multiSelectField(field('spec_'+d.key,d.label,'multiselect',values[d.key]||[],d.choices.map(x=>[x,x])));read=()=>Array.from(input.querySelectorAll('input:checked'),x=>x.value)}
+   if(d.allow_custom&&d.type==='multi'){const colors=colorList(d,values[d.key]);input=colors.box;read=colors.read}
+   else if(d.allow_custom){const color=colorInput(d,values[d.key]);input=color.box;color.input.required=d.required;read=()=>color.input.value.trim()||undefined}
+   else if(d.type==='multi'){input=multiSelectField(field('spec_'+d.key,d.label,'multiselect',values[d.key]||[],d.choices.map(x=>[x,x])));read=()=>Array.from(input.querySelectorAll('input:checked'),x=>x.value)}
    else if(['boolean','select'].includes(d.type)){input=el('select',{},el('option',{value:''},'Select…'),(d.type==='boolean'?['Yes','No']:d.choices).map(v=>el('option',{value:v},v)));input.value=d.type==='boolean'?(values[d.key]==null?'':values[d.key]?'Yes':'No'):values[d.key]||'';read=()=>input.value===''?undefined:d.type==='boolean'?input.value==='Yes':input.value}
    else{input=el('input',{type:d.type==='number'?'number':'text',step:'any',value:values[d.key]??'',placeholder:(d.choices||[]).join(', ')});read=()=>input.value===''?undefined:d.type==='number'?Number(input.value):input.value}
    readers[d.key]=read;input.id='listing-spec-'+d.key;if(d.type!=='multi')input.required=d.required;specsGrid.append(el('div',{class:'field-label'},el(d.type==='multi'?'span':'label',d.type==='multi'?{}:{for:input.id},d.label+(d.unit?' ('+d.unit+')':'')+(d.required?' *':'')),input))
@@ -289,7 +303,7 @@ function listingSpecs(form,product){
   const add=()=>({id:!rows.length?product?.variants?.[0]?.id:undefined,sku:'',options:{},price_inr:product?.price_inr||0,stock:!rows.length?product?.stock||0:0})
   if(!rows.length)rows.push(add())
   for(const r of rows){const group=el('fieldset',{class:'variant-card'},el('legend',{},'Variant '+(rows.indexOf(r)+1)))
-   for(const k of axes){const d=defs.get(k),input=el('select',{},el('option',{value:''},'Choose…'),d.choices.map(v=>el('option',{value:v},v)));input.value=r.options[k]||'';input.onchange=()=>r.options[k]=input.value;input.required=true;group.append(el('label',{},d.label,input))}
+   for(const k of axes){const d=defs.get(k);if(d.allow_custom){const color=colorInput(d,r.options[k]);color.input.required=true;color.input.oninput=()=>r.options[k]=color.input.value.trim();group.append(el('label',{},d.label,color.box));continue}const input=el('select',{},el('option',{value:''},'Choose…'),d.choices.map(v=>el('option',{value:v},v)));input.value=r.options[k]||'';input.onchange=()=>r.options[k]=input.value;input.required=true;group.append(el('label',{},d.label,input))}
    for(const [k,title] of [['sku','SKU code'],['price_inr','Price (₹)'],['stock','Stock quantity']]){const input=el('input',{type:k==='sku'?'text':'number',min:0,step:k==='price_inr'?'.01':'1',value:r[k]});input.required=true;if(k==='price_inr'){input.min='.01';input.dataset.skuPrice='true';}input.oninput=()=>r[k]=k==='sku'?input.value:Number(input.value);group.append(el('label',{},title,input))}
    if(!r.id&&rows.length>1)group.append(button('Remove variant',()=>{rows=rows.filter(x=>x!==r);draw()}));box.append(group)
   }
