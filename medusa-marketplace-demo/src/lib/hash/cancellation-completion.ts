@@ -83,6 +83,6 @@ export async function processCancellation(container:any,orderId:string){
 }
 
 export async function processApprovedCancellations(container:any){
- const {rows}=await db().query("SELECT order_id FROM hash_order WHERE cancellation_request->'completion'->>'status' IN ('queued','refund_pending','processing') ORDER BY created_at LIMIT 25")
+ const {rows}=await db().query("SELECT order_id FROM hash_order WHERE cancellation_request->'completion'->>'status' IN ('queued','refund_pending','processing') ORDER BY cancellation_request->'completion'->>'updated_at' ASC NULLS FIRST LIMIT 25")
  for(const row of rows){try{await processCancellation(container,row.order_id)}catch(e){container.resolve('logger').error('Cancellation recovery failed for '+row.order_id)}}
 }
