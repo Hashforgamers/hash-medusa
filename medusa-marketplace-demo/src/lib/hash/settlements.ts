@@ -34,8 +34,9 @@ export async function reconcileOrder(container: any, id: string) {
     if(gateway.length===payments.length&&gateway.length)await c.query('UPDATE hash_order SET gateway_fee_paise=$2,gateway_tax_paise=$3 WHERE order_id=$1',[id,gateway.reduce((n:number,p:any)=>n+Number(p.data.gateway_fee_minor),0),gateway.reduce((n:number,p:any)=>n+Number(p.data.gateway_tax_minor||0),0)])
     const captures = payments.flatMap((p: any) => p.captures || [])
     const captured = captures.reduce((s: number, p: any) => s + minorUnits(p.amount,order.currency_code),0)
-    const refunded = payments.flatMap((p: any) => p.refunds || []).reduce((s: number,p: any) => s + minorUnits(p.amount,order.currency_code),0)
+    const providerRefunded = payments.flatMap((p: any) => p.refunds || []).reduce((s: number,p: any) => s + minorUnits(p.amount,order.currency_code),0)
     const { rows: [saved] } = await c.query("SELECT * FROM hash_order WHERE order_id=$1",[id])
+    const refunded = Math.max(providerRefunded,Number(saved.cancellation_request?.manual_refund?.total_refunded_minor||0))
     const hold = saved.cancellation_request && !saved.reviewed_canceled && !(refunded>=total && Number(saved.reviewed_refund_paise)===refunded) ? "Customer cancellation requires review" : order.status === "canceled" && !saved.reviewed_canceled ? "Order canceled" : refunded > 0 && refunded !== Number(saved.reviewed_refund_paise) ? "Refund requires Hash review" : total !== Number(saved.reviewed_total_paise ?? saved.total_paise) ? "Order total changed; review required" : captured < total ? "Awaiting full payment capture" : null
     let paidAt = saved.paid_at
     if (!paidAt && captured >= total && total > 0) {

@@ -1,37 +1,48 @@
-const query=jest.fn(),run=jest.fn(),reconcile=jest.fn(),adjust=jest.fn()
+const query=jest.fn(),cancel=jest.fn(),release=jest.fn(),reconcile=jest.fn(),adjust=jest.fn()
 jest.mock('../db',()=>({db:()=>({query}),transaction:async(_key,fn)=>fn({query}),audit:jest.fn()}))
-jest.mock('@medusajs/core-flows',()=>({cancelOrderWorkflow:()=>({run})}))
 jest.mock('../settlements',()=>({reconcileOrder:(...args)=>reconcile(...args),reviewAdjustment:(...args)=>adjust(...args)}))
-import {completeCancellation,processCancellation} from '../cancellation-completion'
-const graph=jest.fn(),container={resolve:()=>({graph})}
-const state={status:'queued',approved_by:'admin',note:'Parcel remains with seller',updated_at:'2020-01-01'}
-beforeEach(()=>{query.mockReset();run.mockReset();graph.mockReset();reconcile.mockReset();adjust.mockReset()})
-test('vendors cannot approve refunds',async()=>{
- await expect(completeCancellation(container,{superAdmin:false},{order_id:'order_QA'})).rejects.toThrow('Only Hash')
- expect(query).not.toHaveBeenCalled();expect(run).not.toHaveBeenCalled()
+import {completeCancellation,processCancellation,recordManualRefund} from '../cancellation-completion'
+import {Modules} from '@medusajs/framework/utils'
+const graph=jest.fn(),container={resolve:(name)=>{
+ if(name===Modules.ORDER)return {cancel}
+ if(name===Modules.INVENTORY)return {deleteReservationItemsByLineItem:release}
+ if(name==='query')return {graph}
+ throw Error('Unexpected service call '+name)
+}}
+const state={mode:'manual',status:'queued',approved_by:'admin',note:'Parcel remains with seller',updated_at:'2020-01-01'}
+beforeEach(()=>{query.mockReset();cancel.mockReset();release.mockReset();graph.mockReset();reconcile.mockReset();adjust.mockReset()})
+test('vendors cannot approve cancellation or record refunds',async()=>{
+ await expect(completeCancellation(container,{superAdmin:false},{order_id:'QA'})).rejects.toThrow('Only Hash')
+ await expect(recordManualRefund(container,{superAdmin:false},{order_id:'QA'})).rejects.toThrow('Only Hash')
+ expect(query).not.toHaveBeenCalled()
 })
-test('a second processor leaves an active durable claim alone',async()=>{
+test('a second processor leaves an active manual claim alone',async()=>{
  query.mockResolvedValue({rows:[{cancellation_request:{completion:{...state,status:'processing',updated_at:new Date().toISOString()}}}]})
- await processCancellation(container,'order_QA');expect(run).not.toHaveBeenCalled()
+ await processCancellation(container,'QA');expect(cancel).not.toHaveBeenCalled()
 })
-test('resumes reconciliation after order cancellation without refunding again',async()=>{
- query.mockImplementation(async sql=>sql.startsWith('SELECT * FROM hash_order')?{rows:[{cancellation_request:{completion:state},canceled_at:new Date(),captured_paise:1000,refunded_paise:1000}]}:{rows:[]})
- graph.mockResolvedValue({data:[{status:'canceled'}]})
- await processCancellation(container,'order_QA')
- expect(run).not.toHaveBeenCalled();expect(adjust).toHaveBeenCalled()
- expect(query.mock.calls.some(([sql,args])=>sql.includes("delivery_status='canceled'")&&args[1].status==='closed')).toBe(true)
+test('cancels and releases inventory while leaving the refund for Hash to handle manually',async()=>{
+ query.mockImplementation(async sql=>sql.startsWith('SELECT * FROM hash_order')?{rows:[{cancellation_request:{completion:state},canceled_at:new Date(),captured_paise:2000,refunded_paise:0}]}:{rows:[]})
+ graph.mockResolvedValue({data:[{status:'pending',items:[{id:'item_QA'}]}]})
+ await processCancellation(container,'QA')
+ expect(cancel).toHaveBeenCalledWith('QA');expect(release).toHaveBeenCalledWith(['item_QA'])
+ expect(query.mock.calls.some(([sql,args])=>sql.includes("delivery_status='canceled'")&&args[1].refund.status==='manual_pending')).toBe(true)
 })
-test('persists provider delay for automatic recovery instead of completing',async()=>{
- query.mockImplementation(async sql=>sql.startsWith('SELECT * FROM hash_order')?{rows:[{cancellation_request:{completion:state}}]}:sql.startsWith('SELECT status FROM hash_cancellation_refund')?{rows:[{status:'pending'}]}:{rows:[]})
- graph.mockResolvedValue({data:[{status:'pending'}]});run.mockRejectedValue(Error('Refund pending'))
- await processCancellation(container,'order_QA')
- expect(query.mock.calls.some(([sql,args])=>sql.startsWith('UPDATE hash_order')&&args[1].status==='refund_pending')).toBe(true)
- expect(adjust).not.toHaveBeenCalled()
+test('recovers an old failed automatic refund approval using manual handling',async()=>{
+ query.mockImplementation(async sql=>sql.startsWith('SELECT * FROM hash_order')?{rows:[{cancellation_request:{completion:{...state,mode:undefined,status:'needs_attention'}},canceled_at:new Date(),captured_paise:2000,refunded_paise:0}]}:{rows:[]})
+ graph.mockResolvedValue({data:[{status:'canceled',items:[]}]})
+ await processCancellation(container,'QA')
+ expect(cancel).not.toHaveBeenCalled();expect(adjust).toHaveBeenCalled()
+ expect(query.mock.calls.some(([sql,args])=>sql.includes("delivery_status='canceled'")&&args[1].completion.status==='complete')).toBe(true)
 })
-test('saves a useful failure and never marks an incomplete refund complete',async()=>{
- query.mockImplementation(async sql=>sql.startsWith('SELECT * FROM hash_order')?{rows:[{cancellation_request:{completion:state},canceled_at:new Date(),captured_paise:1000,refunded_paise:0}]}:{rows:[]})
- graph.mockResolvedValue({data:[{status:'canceled'}]})
- await processCancellation(container,'order_QA')
- expect(query.mock.calls.some(([sql,args])=>sql.startsWith('UPDATE hash_order')&&args[1].status==='needs_attention')).toBe(true)
- expect(query.mock.calls.some(([sql])=>sql.includes("delivery_status='canceled'"))).toBe(false)
+test('requires a confirmed cancellation and matching outstanding amount for a manual refund entry',async()=>{
+ query.mockResolvedValue({rows:[{canceled_at:null}]})
+ await expect(recordManualRefund(container,{superAdmin:true},{order_id:'QA'})).rejects.toThrow('Cancel the order')
+ query.mockResolvedValue({rows:[{canceled_at:new Date(),captured_paise:2000,refunded_paise:0}]})
+ await expect(recordManualRefund(container,{superAdmin:true},{order_id:'QA',amount_minor:1000})).rejects.toThrow('amount changed')
+})
+test('repeated manual receipt is idempotent and a different second receipt is rejected',async()=>{
+ query.mockResolvedValue({rows:[{canceled_at:new Date(),cancellation_request:{manual_refund:{reference:'bank_QA'}}}]})
+ await recordManualRefund(container,{superAdmin:true},{order_id:'QA',reference:'bank_QA'})
+ expect(query.mock.calls.some(([sql])=>sql.startsWith('UPDATE'))).toBe(false)
+ await expect(recordManualRefund(container,{superAdmin:true},{order_id:'QA',reference:'bank_Other'})).rejects.toThrow('already been recorded')
 })

@@ -30,3 +30,5 @@ it('does not accept unsigned webhook payment claims',async()=>{expect(await prov
 
 it('records only provider-confirmed gateway fees and does not add GST twice',async()=>{remote({}, {fee:236,tax:36});const r=await provider.authorizePayment({data:{...data,gateway_fee_minor:99999},context:{idempotency_key:session_id}});expect(r.data).toMatchObject({gateway_fee_minor:236,gateway_tax_minor:36})})
 it('drops client-supplied fees when the provider fee is unknown',async()=>{remote();const r=await provider.authorizePayment({data:{...data,gateway_fee_minor:99999,gateway_tax_minor:1},context:{idempotency_key:session_id}});expect(r.data.gateway_fee_minor).toBeUndefined();expect(r.data.gateway_tax_minor).toBeUndefined()})
+
+it('never calls Razorpay to refund while Hash uses manual handling',async()=>{await expect(provider.refundPayment({data,amount:10,context:{idempotency_key:'ref_QA'}})).rejects.toThrow('manually');expect(fetchMock).not.toHaveBeenCalled()})

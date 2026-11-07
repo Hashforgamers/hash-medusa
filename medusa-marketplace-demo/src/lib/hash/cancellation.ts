@@ -5,10 +5,10 @@ import { delhiveryConfig,delhiveryRequest,syncShipment } from './delhivery'
 export const cancellationReason=z.string().trim().min(5).max(500)
 export function publicCancellation(request:any){
  if(!request)return null
- const {completion,...rest}=request
+ const {completion,manual_refund,refund,...rest}=request
  if(!completion)return rest
  const {status,approved_at,updated_at,completed_at}=completion
- return {...rest,completion:{status,approved_at,updated_at,completed_at}}
+ return {...rest,completion:{status,approved_at,updated_at,completed_at},...(refund?{refund:{status:refund.status}}:{}),...(manual_refund?{manual_refund:{amount_minor:manual_refund.amount_minor,recorded_at:manual_refund.recorded_at}}:{})}
 }
 const active=(o:any)=>o.cancellation_request&&o.cancellation_request.status!=='closed'
 export async function requestCancellation(orderId:string,reason:string,identity:{customerId?:string,actor?:any}){
