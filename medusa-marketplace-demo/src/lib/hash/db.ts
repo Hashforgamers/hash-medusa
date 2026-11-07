@@ -37,6 +37,12 @@ export async function migrate() {
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_revision integer NOT NULL DEFAULT 0;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_verified_at timestamptz;
   ALTER TABLE hash_vendor ADD COLUMN IF NOT EXISTS bank_verified_by text;
+  CREATE TABLE IF NOT EXISTS hash_cancellation_refund (
+    session_id text PRIMARY KEY, order_id text NOT NULL,
+    payment_id text NOT NULL, key_id text NOT NULL, amount_minor bigint NOT NULL CHECK(amount_minor>0),
+    status text NOT NULL DEFAULT 'approved', refund_id text, medusa_refund_id text,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
   CREATE TABLE IF NOT EXISTS hash_settlement_plan (
     id text PRIMARY KEY, revision integer NOT NULL DEFAULT 1, definition jsonb NOT NULL,
     active boolean NOT NULL DEFAULT true, is_default boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now()

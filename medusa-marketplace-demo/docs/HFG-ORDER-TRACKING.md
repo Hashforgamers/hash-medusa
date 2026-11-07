@@ -65,3 +65,13 @@ Response: `{ "cancellation": { "status": "requested", "reason": "...", "requeste
 Show “Cancellation requested” immediately and disable repeat cancellation / OTP completion while the request exists. In-transit cancellation can result in return-to-origin; carrier charges may still apply. Hash reviews the refund separately. No changes to hfg-user-onboard authentication are required.
 
 Cancellation tracking returns `status: "cancellation_pending"` while a cancellation request is open and the order has not been canceled. Render “Cancellation pending” and disable dispatch/label actions. The `cancellation.status` field describes courier request progress. A value of `courier_requested` means the courier accepted the request; it does not establish order cancellation or customer refund completion. Order cancellation is reported by `status: "canceled"`.
+
+## Completing a cancellation
+
+Hash Operations can use **Customer orders → Complete cancellation & refund** after courier acceptance or confirmation that no shipment was booked. The confirmation requires the operator to verify that the parcel remains with the seller or has been returned safely. It authorizes the remaining captured payment to be refunded through Razorpay, and cancels the Medusa order and unpaid vendor sale settlements. Actual courier fees and money already paid to vendors remain in recovery reporting.
+
+The approval, note, timestamps and progress persist in the order's `cancellation.completion` object. Its `status` is `queued`, `processing`, `refund_pending`, `needs_attention` or `complete`. The customer app should show “Refund processing” for `refund_pending`, and a support message for `needs_attention`. Only `complete` means the order and monetary refund have both been reconciled. Hash Operations sees the error and can retry the saved request. Vendor and customer interfaces should not expose internal errors or approval notes.
+
+Approved pending refunds and interrupted processing are checked automatically every minute. Razorpay submissions reuse the saved amount and a stable `X-Refund-Idempotency` header. Provider-confirmed pending refunds are saved separately and are only recorded as refunded money after Razorpay reports `processed`. References are retained for audit. A provider failure requires Operations review.
+
+Requests created before this feature still need the one-time **Complete cancellation & refund** approval. Payment providers other than Razorpay need their payment refunds reconciled before this action. Opening or refreshing a page does not approve a refund.

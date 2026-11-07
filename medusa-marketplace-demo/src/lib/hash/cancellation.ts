@@ -3,13 +3,20 @@ import { db,transaction,audit } from './db'
 import { fail,own,requireHash } from './access'
 import { delhiveryConfig,delhiveryRequest,syncShipment } from './delhivery'
 export const cancellationReason=z.string().trim().min(5).max(500)
+export function publicCancellation(request:any){
+ if(!request)return null
+ const {completion,...rest}=request
+ if(!completion)return rest
+ const {status,approved_at,updated_at,completed_at}=completion
+ return {...rest,completion:{status,approved_at,updated_at,completed_at}}
+}
 const active=(o:any)=>o.cancellation_request&&o.cancellation_request.status!=='closed'
 export async function requestCancellation(orderId:string,reason:string,identity:{customerId?:string,actor?:any}){
  reason=cancellationReason.parse(reason)
  return transaction(`order:${orderId}`,async c=>{
   const {rows:[o]}=await c.query('SELECT * FROM hash_order WHERE order_id=$1 FOR UPDATE',[orderId]);if(!o)fail('Order not found')
   if(identity.customerId){if(o.customer_id!==identity.customerId)fail('Order not found')}else own(identity.actor,o.vendor_id)
-  if(active(o))return o.cancellation_request
+  if(active(o))return identity.customerId?publicCancellation(o.cancellation_request):o.cancellation_request
   if(o.completed_at||o.canceled_at||o.reviewed_canceled)fail('This order is already completed or canceled; contact support for a return')
   const request={status:'requested',reason,requested_at:new Date().toISOString(),source:identity.customerId?'customer':'partner_recorded'}
   await c.query('UPDATE hash_order SET cancellation_request=$2,hold_reason=$3,delivery_revision=delivery_revision+1 WHERE order_id=$1',[orderId,request,'Customer cancellation requires review'])

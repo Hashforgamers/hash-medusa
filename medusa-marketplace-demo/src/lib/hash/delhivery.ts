@@ -12,6 +12,7 @@ export const shippingCommands=z.discriminatedUnion('action',[
  z.object({action:z.literal('wallet_snapshot'),balance_paise:z.number().int().min(-100000000).max(1000000000),minimum_paise:z.number().int().min(0).max(100000000),alert_paise:z.number().int().min(0).max(100000000),account:z.string().trim().min(2).max(150),note:z.string().trim().min(10).max(500)}),
  z.object({action:z.literal('request_cancellation'),order_id:id,reason:z.string().trim().min(5).max(500)}),
  z.object({action:z.literal('cancel_courier'),order_id:id,confirmed:z.literal(true)}),
+ z.object({action:z.literal('complete_cancellation'),order_id:id,note:z.string().trim().min(5).max(1000),goods_safe:z.literal(true),confirmed:z.literal(true)}),
  z.object({action:z.literal('resolve_cancellation'),order_id:id,accepted:z.boolean(),note:z.string().trim().min(20).max(1000),confirmed:z.literal(true)}),
  z.object({action:z.literal('resolve_dispatch'),kind:z.enum(['location','pickup']),id,note:z.string().trim().min(20).max(1000),outcome:z.enum(['confirmed','absent']),carrier_id:z.string().regex(/^[1-9]\d*$/).optional(),confirmed:z.literal(true)}),
  z.object({action:z.literal('prepare_dispatch'),order_id:id,delivery_address:dispatchAddress.optional(),pickup_address:dispatchAddress.optional(),packed_parcel:parcelSchema.pick({weight_g:true,length_cm:true,width_cm:true,height_cm:true}).optional()}),

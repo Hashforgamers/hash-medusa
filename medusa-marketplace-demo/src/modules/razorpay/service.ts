@@ -1,3 +1,4 @@
+import { cancellationRefund } from '../../lib/hash/cancellation-refund'
 import { db } from '../../lib/hash/db'
 import { decryptCredential } from '../../lib/hash/payout-connectors'
 import { AbstractPaymentProvider, BigNumber, PaymentSessionStatus } from '@medusajs/framework/utils'
@@ -24,11 +25,11 @@ export default class RazorpayProvider extends AbstractPaymentProvider<Options> {
     if (options.mode === 'live' || options.mode === 'test') return
     if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(options.key_id || '') || !options.key_secret) throw Error('Configure Razorpay key ID and secret on the server')
   }
-  private async request(path: string, body?: any) {
+  private async request(path: string, body?: any, headers: Record<string,string> = {}) {
     if (this.options.key_id.startsWith('rzp_live_') && process.env.HASH_DEMO_MODE === 'true') throw Error('Live Razorpay checkout is disabled in demo mode')
     let response: Response
     try {
-      response = await fetch('https://api.razorpay.com/v1' + path, { method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(15000), headers: { Authorization: 'Basic ' + Buffer.from(this.options.key_id + ':' + this.options.key_secret).toString('base64'), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      response = await fetch('https://api.razorpay.com/v1' + path, { method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(15000), headers: { Authorization: 'Basic ' + Buffer.from(this.options.key_id + ':' + this.options.key_secret).toString('base64'), 'Content-Type': 'application/json', ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) })
     } catch { throw Error('Razorpay did not respond. Check the payment status before retrying checkout.') }
     if (!response.ok) throw Error(`Razorpay request failed (HTTP ${response.status})`)
     return response.json()
@@ -100,9 +101,11 @@ export default class RazorpayProvider extends AbstractPaymentProvider<Options> {
     return { data: result.data }
   }
   async deletePayment(input: DeletePaymentInput) { return this.cancelPayment(input) }
-  async refundPayment(_input: RefundPaymentInput): Promise<{ data: Record<string, unknown> }> {
-    // Never report a local refund as successful without a provider-confirmed refund.
-    throw Error('Razorpay cart refunds require operator reconciliation; automatic refunds are not enabled yet.')
+  async refundPayment(input: RefundPaymentInput): Promise<{ data: Record<string, unknown> }> {
+    if (this.options.mode) return (await this.bound()).refundPayment(input)
+    const data=this.validate(input.data)
+    return cancellationRefund(data,paise(input.amount),input.context?.idempotency_key,
+      (path,body,headers)=>this.request(path,body,headers))
   }
   async getWebhookActionAndData(_payload: ProviderWebhookPayload['payload']): Promise<WebhookActionResult> {
     // Checkout completion always verifies against Razorpay directly; unverified webhooks cannot mark orders paid.
