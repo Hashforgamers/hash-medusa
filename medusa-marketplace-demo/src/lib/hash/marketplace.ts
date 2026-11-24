@@ -7,6 +7,7 @@ import { db, transaction, audit } from "./db"
 import { storedBank } from "./vendor-profile"
 import { currencyDigits } from "./policy"
 import { fail, own, requireHash } from "./access"
+import { loggerFrom, pingProducts } from "./seo-ping"
 
 export async function createAccount(container: any, email: string, password: string, metadata: any = {}) {
   const auth = container.resolve(Modules.AUTH), users = container.resolve(Modules.USER)
@@ -63,7 +64,8 @@ export async function saveProduct(container: any,a: any,b: any) {
     const scale=10**currencyDigits(p.currency_code)
     if(Math.abs(p.amount*scale-Math.round(p.amount*scale))>0.000001)fail("Price has too many decimal places for its currency")
   }
-  return transaction(`product:${b.product_id || b.vendor_id}`, async c => {
+  let wasListed=false
+  const saved=await transaction(`product:${b.product_id || b.vendor_id}`, async c => {
     let productId = b.product_id
     const [store] = await container.resolve(Modules.STORE).listStores()
     const [profile] = await container.resolve(Modules.FULFILLMENT).listShippingProfiles({type:"default"})
@@ -99,6 +101,7 @@ export async function saveProduct(container: any,a: any,b: any) {
       const { rows:[listing] } = await c.query("SELECT * FROM hash_listing WHERE product_id=$1",[productId])
       if (!listing || listing.vendor_id !== b.vendor_id) fail("Product not found")
       own(a,listing.vendor_id)
+      wasListed=listing.approval==="approved"&&vendor.status==="active"&&old?.status==="published"
       // Unpublish before editing. A failed edit stays safely unpublished and pending.
       await container.resolve(Modules.PRODUCT).updateProducts(productId,{status:"draft"})
       await c.query("UPDATE hash_listing SET approval='pending',review_note='',updated_at=now() WHERE product_id=$1",[productId])
@@ -134,6 +137,9 @@ export async function saveProduct(container: any,a: any,b: any) {
     await audit(c,a.id,"listing_submitted",productId,{vendor_id:b.vendor_id})
     return { product_id:productId,approval:"pending" }
   })
+  // Editing a live listing unpublishes it pending review; ask search engines to recrawl.
+  if(wasListed)void pingProducts([saved.product_id],loggerFrom(container))
+  return saved
 }
 export async function setStock(container: any,productId: string,stock: number,variantId?:string) {
   const {data:[product]} = await container.resolve("query").graph({entity:"product",fields:["id","variants.id","variants.inventory_items.inventory_item_id"],filters:{id:productId}})
@@ -149,10 +155,12 @@ export async function setStock(container: any,productId: string,stock: number,va
 }
 export async function reviewProduct(container: any,a: any,b: any) {
   requireHash(a)
-  return transaction(`product:${b.product_id}`,async c => {
+  let wasListed=false
+  const reviewed=await transaction(`product:${b.product_id}`,async c => {
     const {rows:[listing]} = await c.query("SELECT l.*,v.status FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id WHERE product_id=$1",[b.product_id])
     if (!listing) fail("Product not found")
     if (b.approval === "approved" && listing.status !== "active") fail("Activate the vendor first")
+    wasListed=listing.approval==="approved"&&listing.status==="active"
     // Draft first closes access even if publishing or the SQL transaction fails.
     await container.resolve(Modules.PRODUCT).updateProducts(b.product_id,{status:"draft"})
     await c.query("UPDATE hash_listing SET approval=$2,review_note=$3,updated_at=now() WHERE product_id=$1",[b.product_id,b.approval,b.review_note])
@@ -160,6 +168,10 @@ export async function reviewProduct(container: any,a: any,b: any) {
     await audit(c,a.id,"listing_reviewed",b.product_id,{approval:b.approval,note:b.review_note})
     return {product_id:b.product_id,approval:b.approval}
   })
+  // Approval lists the product; rejecting a live listing unlists it. Pinged after commit because the
+  // product.updated subscriber can run before the approval is visible.
+  if(b.approval==="approved"||wasListed)void pingProducts([b.product_id],loggerFrom(container))
+  return reviewed
 }
 export async function catalog(container: any, vendorId?: string, publicOnly=false) {
   const {rows} = await db().query(`SELECT l.*,v.name AS vendor_name FROM hash_listing l JOIN hash_vendor v ON v.id=l.vendor_id

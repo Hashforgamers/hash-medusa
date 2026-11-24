@@ -8,6 +8,7 @@ import { Modules } from "@medusajs/framework/utils"
 import { z } from "zod"
 import { actor, requireHash, own, fail } from "../../../lib/hash/access"
 import { db, audit, transaction } from "../../../lib/hash/db"
+import { loggerFrom, pingListedProducts, pingProducts } from "../../../lib/hash/seo-ping"
 import { onboard, addMember, saveProduct, reviewProduct, catalog, setStock } from "../../../lib/hash/marketplace"
 import { reconcileOrder, reconcileAll, recordPayout, verifyOtp, reviewAdjustment } from "../../../lib/hash/settlements"
 import { bankSchema, businessSchema, storedBank, publicVendor } from "../../../lib/hash/vendor-profile"
@@ -84,16 +85,26 @@ export async function POST(req: MedusaRequest,res: MedusaResponse) {
  case "reconcile": requireHash(a);await reconcileAll(req.scope);result={ok:true};break
  case "stock": {
   const {rows:[p]}=await db().query("SELECT * FROM hash_listing WHERE product_id=$1",[b.product_id]); if(!p) fail("Product not found");own(a,p.vendor_id)
-  await transaction(`product:${b.product_id}`,async c=>{await setStock(req.scope,b.product_id,b.stock,b.variant_id);await audit(c,a.id,"stock_updated",b.product_id,{stock:b.stock})});result={ok:true};break
+  await transaction(`product:${b.product_id}`,async c=>{await setStock(req.scope,b.product_id,b.stock,b.variant_id);await audit(c,a.id,"stock_updated",b.product_id,{stock:b.stock})});result={ok:true}
+  pingListedProducts([b.product_id],loggerFrom(req.scope));break
  }
- case "vendor_settings": requireHash(a);await transaction(`vendor:${b.vendor_id}`,async c=>{
+ case "vendor_settings": {requireHash(a);let before:any
+  await transaction(`vendor:${b.vendor_id}`,async c=>{
+  before=(await c.query("SELECT status,name FROM hash_vendor WHERE id=$1 FOR UPDATE",[b.vendor_id])).rows[0]
   const {rowCount}=await c.query("UPDATE hash_vendor SET status=$2,commission_bps=$3,payment_mode=$4,payout_details=$5 WHERE id=$1",[b.vendor_id,b.status,b.commission_bps,b.payment_mode,b.payout_details]);if(!rowCount)fail("Vendor not found")
   if(b.settlement_plan_id!==undefined){if(b.settlement_plan_id&&!(await c.query('SELECT 1 FROM hash_settlement_plan WHERE id=$1 AND active',[b.settlement_plan_id])).rowCount)fail('Choose an active settlement plan');await c.query('UPDATE hash_vendor SET settlement_plan_id=$2 WHERE id=$1',[b.vendor_id,b.settlement_plan_id])}
   if(b.name)await c.query("UPDATE hash_vendor SET name=$2 WHERE id=$1",[b.vendor_id,b.name])
   if(b.business_details)await c.query("UPDATE hash_vendor SET business_details=$2 WHERE id=$1",[b.vendor_id,JSON.stringify(b.business_details)])
   if(b.bank_details){await c.query("UPDATE hash_vendor SET bank_details=$2,auto_payout=false,bank_verified_at=NULL,bank_verified_by=NULL,bank_revision=bank_revision+1 WHERE id=$1",[b.vendor_id,JSON.stringify(storedBank(b.bank_details))]);await audit(c,a.id,"bank_details_updated",b.vendor_id)}
   await audit(c,a.id,"vendor_settings_updated",b.vendor_id,{status:b.status,commission_bps:b.commission_bps,payment_mode:b.payment_mode})
- });result={ok:true};break
+ });result={ok:true}
+ // Suspending or reactivating a vendor unlists or relists every approved product; a rename changes listing pages.
+ if(before&&(before.status!==b.status||(b.status==="active"&&b.name&&b.name!==before.name))){
+  const logger=loggerFrom(req.scope)
+  db().query("SELECT l.product_id FROM hash_listing l JOIN product p ON p.id=l.product_id WHERE l.vendor_id=$1 AND l.approval='approved' AND p.status='published' AND p.deleted_at IS NULL",[b.vendor_id])
+   .then(({rows})=>pingProducts(rows.map(r=>r.product_id),logger),e=>logger.warn(`SEO ping lookup failed: ${e.message}`)).catch(()=>{})
+ }
+ break}
  case "payout_failed": {
   requireHash(a)
   const {rows:[s]}=await db().query("SELECT * FROM hash_settlement WHERE id=$1",[b.settlement_id]);if(!s)fail("Settlement not found")
