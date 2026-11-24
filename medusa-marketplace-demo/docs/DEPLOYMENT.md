@@ -10,6 +10,8 @@ Set `ADMIN_CORS=https://partners.hashforgamers.com`. Set `STORE_CORS` to the act
 
 For first deployment only, set `HASH_ADMIN_EMAIL` and a strong `HASH_ADMIN_PASSWORD`. Remove both after successful setup. Setup never resets an existing account's password or privileges. Do not upload local credentials, `.env`, or the local database.
 
+To have search engines recrawl product pages, set `SEO_PING_SECRET` to the website's SEO ping secret. The backend then sends `POST` with `{"productIds":[...]}` and `Authorization: Bearer <secret>` to `SEO_PING_URL` (default `https://www.hashforgamers.com/api/seo/indexnow`) when a listing is approved, rejected, edited, deleted, restocked, or its vendor is suspended, reactivated or renamed. Pings run in the background with a 5 second timeout; failures are only logged. Leave `SEO_PING_SECRET` unset to disable pinging.
+
 Keep PostgreSQL backups enabled and retain the OTP secret across deploys. Run migrations before additional instances if scaling later. Confirm resource pricing before provisioning new paid resources.
 
 ## Vercel portal
