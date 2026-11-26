@@ -40,6 +40,7 @@ module.exports = defineConfig({
     { resolve: "@medusajs/medusa/auth", options: { providers: [
       { resolve: "@medusajs/medusa/auth-emailpass", id: "emailpass" },
       { resolve: "./src/modules/hfg-auth", id: "hfg" },
+      { resolve: "./src/modules/hfg-cafe-auth", id: "hfg-cafe" },
     ] } },
     ...(useRedis ? [
     { key: Modules.CACHE, resolve: "@medusajs/cache-redis", options: { redisUrl: process.env.REDIS_URL } },

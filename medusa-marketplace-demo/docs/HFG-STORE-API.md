@@ -37,6 +37,10 @@ The provider maps the stable authenticated numeric HFG user ID to a Medusa auth 
 
 Keep the Medusa token in secure app storage (or tab memory on web); never log it. On HFG logout clear the Medusa token/cart UI and, if using cookies, call `DELETE /auth/session`. Refresh store access by exchanging a valid HFG token again rather than storing a second password. The bridge validates HFG account status at exchange time; an already issued Medusa token remains valid until its Medusa expiry. Immediate cross-service revocation is not implemented. Configure an appropriate Medusa JWT lifetime for production.
 
+### Cafes buying from the HFG dashboard
+
+The dashboard Shop buys on this same storefront, with the cafe as the customer. Its server calls `POST /auth/customer/hfg-cafe` with `{"token":"<dashboard token>","vendor_id":<cafe id>}`. The `hfg-cafe` provider asks `HFG_DASHBOARD_URL/api/vendor/<id>/marketplace/buyer` (hfg-dashboard) to confirm the token belongs to that cafe (owner login, or a staff session with `store.manage`), and maps it to the auth identity `hfg-cafe:<id>`. Registration is the same as above (`POST /store/customers` once, then exchange again). A cafe's store customer is separate from any gamer account its owner has. Everything after sign-in (carts, delivery, Razorpay, orders, cancellation, completion code) is the normal customer API.
+
 ## Customer API inventory
 
 All paths below are relative to `MEDUSA_BASE_URL`. “Customer” means the linked Medusa bearer token plus publishable key; “Public” still requires the publishable key.
@@ -129,6 +133,7 @@ The portal selects a JPEG/PNG/WebP (maximum 5 MB), uploads it through Medusa, pr
 
 ```text
 HFG_USER_ONBOARD_URL=https://hfg-user-onboard.onrender.com
+HFG_DASHBOARD_URL=https://<hfg-dashboard origin>   # cafe buyers (dashboard Shop)
 CLOUDINARY_CLOUD_NAME=<existing account cloud>
 CLOUDINARY_API_KEY=<server-only>
 CLOUDINARY_API_SECRET=<server-only>
